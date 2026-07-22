@@ -11,6 +11,7 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
+import tkinter as tk
 from tkinter import filedialog, messagebox, StringVar
 import warnings
 from typing import Optional
@@ -101,9 +102,13 @@ class PhantomTankGUI:
 
     def _setup_window(self):
         self.root = ctk.CTk()
-        self.root.title("PhantomTank - 幻影坦克图片合成工具")
+        self.root.title("PhantomTankFactory")
         self.root.resizable(True, True)
         self.root.minsize(640, 500)
+
+        icon_path = Path(__file__).resolve().parent / "assets" / "icons" / "PhantomTankFactorySmall.png"
+        if icon_path.exists():
+            self.root.iconphoto(True, tk.PhotoImage(file=str(icon_path)))
 
 
     def _apply_initial_geometry(self):
@@ -240,7 +245,7 @@ class PhantomTankGUI:
         about.grid_columnconfigure(0, weight=1)
 
         ctk.CTkLabel(
-            about, text="PhantomTank",
+            about, text="PhantomTankFactory",
             font=ctk.CTkFont(size=28, weight="bold"),
         ).grid(row=0, column=0, sticky="s", pady=(0, 4))
 
