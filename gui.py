@@ -59,8 +59,8 @@ class PhantomTankGUI:
 
         self.surface_image: Optional[Image.Image] = None
         self.inner_image: Optional[Image.Image] = None
-        self.surface_thumb: Optional[Path] = None
-        self.inner_thumb: Optional[Path] = None
+        self.surface_thumb: Optional[Image.Image] = None
+        self.inner_thumb: Optional[Image.Image] = None
         self.last_output_path: Optional[Path] = None
         self._progress_anim_id: str | None = None
         self._progress_value: float = 0.0
@@ -98,14 +98,13 @@ class PhantomTankGUI:
         except Exception:
             pass
 
-    def _make_thumbnail(self, image: Image.Image) -> Path:
-        """为原图生成缩略图并保存到缓存目录"""
+    def _make_thumbnail(self, image: Image.Image) -> Image.Image:
+        """为原图生成缩略图，保存到缓存目录并返回内存中的缩略图"""
         thumb = image.copy()
         thumb.thumbnail((THUMB_MAX, THUMB_MAX), Image.LANCZOS)
         name = f"{id(image)}_{os.getpid()}.png"
-        path = THUMB_DIR / name
-        thumb.save(str(path), "PNG")
-        return path
+        thumb.save(str(THUMB_DIR / name), "PNG")
+        return thumb
 
     def _setup_window(self):
         self.root = ctk.CTk()
@@ -369,22 +368,22 @@ class PhantomTankGUI:
             messagebox.showerror("错误", f"无法打开图片: {e}")
             self.logger.error(f"打开里图失败: {e}")
 
-    def _preview_for_label(self, thumb_path: Path,
+    def _preview_for_label(self, thumb: Image.Image,
                            label: ctk.CTkLabel) -> ImageTk.PhotoImage | None:
-        """根据 Label 尺寸加载缩略图"""
+        """根据 Label 尺寸从内存缩略图生成预览"""
         max_w = max(label.winfo_width(), 1)
         max_h = max(label.winfo_height(), 1)
         max_w = max(max_w - 10, 10)
         max_h = max(max_h - 10, 10)
 
         try:
-            preview = Image.open(thumb_path)
-            pw, ph = preview.size
+            pw, ph = thumb.size
             if pw > max_w or ph > max_h:
+                preview = thumb.copy()
                 preview.thumbnail((max_w, max_h), Image.NEAREST)
             else:
                 ratio = min(max_w / pw, max_h / ph)
-                preview = preview.resize(
+                preview = thumb.resize(
                     (int(pw * ratio), int(ph * ratio)), Image.NEAREST)
 
             if preview.mode == "RGBA":
