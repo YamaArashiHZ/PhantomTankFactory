@@ -406,7 +406,7 @@ class PhantomTankGUI:
         max_h = max(max_h - 10, 50)
 
         preview = image.copy()
-        preview.thumbnail((max_w, max_h), Image.LANCZOS)
+        preview.thumbnail((max_w, max_h), Image.NEAREST)
 
         if preview.mode == "RGBA":
             bg = Image.new("RGBA", preview.size, (255, 255, 255, 255))
