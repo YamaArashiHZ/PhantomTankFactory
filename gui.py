@@ -115,8 +115,8 @@ class PhantomTankGUI:
     def _apply_initial_geometry(self):
         sw = self.root.winfo_screenwidth()
         sh = self.root.winfo_screenheight()
-        w = max(860, int(sw * 0.4))
-        h = max(640, int(sh * 0.5))
+        w = int(max(860, int(sw * 0.4)) * 0.75)
+        h = int(max(640, int(sh * 0.5)) * 0.75)
         x = (sw - w) // 2
         y = (sh - h) // 2
         self.root.geometry(f"{w}x{h}+{x}+{y}")
@@ -248,7 +248,8 @@ class PhantomTankGUI:
         )
         self.slider_enhance.grid(row=row, column=1, sticky="ew", padx=(0, pad), pady=6)
         self.brightness_enhance_label = ctk.CTkLabel(
-            settings, text="50", width=36, font=ctk.CTkFont(size=13, weight="bold"))
+            settings, text="50", width=36, anchor="e",
+            font=ctk.CTkFont(size=13, weight="bold"))
         self.brightness_enhance_label.grid(row=row, column=2, padx=(0, pad + 4))
         row += 1
 
@@ -262,7 +263,8 @@ class PhantomTankGUI:
         )
         self.slider_reduce.grid(row=row, column=1, sticky="ew", padx=(0, pad), pady=6)
         self.brightness_reduce_label = ctk.CTkLabel(
-            settings, text="-50", width=36, font=ctk.CTkFont(size=13, weight="bold"))
+            settings, text="-50", width=36, anchor="e",
+            font=ctk.CTkFont(size=13, weight="bold"))
         self.brightness_reduce_label.grid(row=row, column=2, padx=(0, pad + 4))
         row += 1
 
@@ -423,6 +425,7 @@ class PhantomTankGUI:
         dir_path = filedialog.askdirectory(title="选择导出目录")
         if dir_path:
             self.export_dir_var.set(dir_path)
+            self.btn_open_folder.configure(state="normal")
             self.logger.info(f"导出目录设为: {dir_path}")
 
     def _check_ready(self):
@@ -487,7 +490,6 @@ class PhantomTankGUI:
         self._progress_value = 1.0
         self.progress_bar.set(1.0)
         self.status_var.set(f"合成完成！保存至: {output_path}")
-        self.btn_open_folder.configure(state="normal")
         self._set_processing_state(False)
         self._show_toast("幻影坦克合成完毕", output_path.name)
         self._open_save_folder()
@@ -500,14 +502,17 @@ class PhantomTankGUI:
     def _set_processing_state(self, processing: bool):
         state = "disabled" if processing else "normal"
         self.btn_process.configure(state=state)
-        if not processing:
-            self.btn_open_folder.configure(
-                state="normal" if self.last_output_path else "disabled")
 
     def _open_save_folder(self):
+        """打开保存目录；若文件存在则选中，否则仅打开目录"""
+        export = self.export_dir_var.get().strip()
+        if not export:
+            return
+        target_dir = Path(export)
+
         if self.last_output_path and self.last_output_path.exists():
             path_str = str(self.last_output_path.resolve())
-            self.logger.info(f"打开保存目录: {path_str}")
+            self.logger.info(f"打开并选中文件: {path_str}")
             if sys.platform == "win32":
                 subprocess.run(f'explorer /select,"{path_str}"')
             elif sys.platform == "darwin":
@@ -515,7 +520,13 @@ class PhantomTankGUI:
             else:
                 subprocess.run(["xdg-open", str(self.last_output_path.parent)])
         else:
-            messagebox.showinfo("提示", "尚未生成输出文件")
+            self.logger.info(f"打开保存目录: {target_dir}")
+            if sys.platform == "win32":
+                subprocess.run(f'explorer "{target_dir}"')
+            elif sys.platform == "darwin":
+                subprocess.run(["open", str(target_dir)])
+            else:
+                subprocess.run(["xdg-open", str(target_dir)])
 
     def _show_toast(self, title: str, body: str):
         if sys.platform != "win32":
@@ -538,6 +549,8 @@ class PhantomTankGUI:
         self.slider_reduce.set(int(self.config.brightness_reduction))
         self.export_dir_var.set(self.config.export_directory)
         self.debug_var.set(self.config.debug_mode)
+        if self.config.export_directory:
+            self.btn_open_folder.configure(state="normal")
         self._on_enhance_change(self.slider_enhance.get())
         self._on_reduce_change(self.slider_reduce.get())
 
