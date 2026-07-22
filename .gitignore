@@ -1,0 +1,23 @@
+# PhantomTankFactory
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Build artifacts
+build/
+dist/
+*.spec
+*.exe
+
+# Runtime
+temp/
+logs/
+PTM_config.yml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
