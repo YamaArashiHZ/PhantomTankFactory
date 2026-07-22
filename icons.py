@@ -30,7 +30,7 @@ def _svg_to_pil(svg_path: Path, size: int = ICON_SIZE) -> Image.Image:
 def get_icons(light: bool) -> dict[str, Image.Image]:
     """返回当前主题下的三枚图标"""
     theme = "light" if light else "dark"
-    names = ["home", "theme", "about"]
+    names = ["home", "preview", "theme", "about"]
     result = {}
     for name in names:
         path = ICONS_DIR / f"{name}_{theme}.svg"

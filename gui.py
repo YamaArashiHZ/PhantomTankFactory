@@ -51,6 +51,8 @@ class PhantomTankGUI:
         self.last_output_path: Optional[Path] = None
         self._progress_anim_id: str | None = None
         self._progress_value: float = 0.0
+        self._preview_surface_img: Optional[Image.Image] = None
+        self._preview_inner_img: Optional[Image.Image] = None
         self._icons: dict[str, ctk.CTkImage] = {}
         self._current_page: str = "home"
 
@@ -134,6 +136,14 @@ class PhantomTankGUI:
         )
         self.btn_home.pack(side="top", pady=(8, 2))
 
+        self.btn_preview = ctk.CTkButton(
+            self.nav_frame, text="", image=self._icons["preview"],
+            width=40, height=40, fg_color="transparent",
+            hover_color=("gray80", "gray25"),
+            command=lambda: self._show_page("preview"),
+        )
+        self.btn_preview.pack(side="top", pady=2)
+
         # 底部区域
         bottom = ctk.CTkFrame(self.nav_frame, fg_color="transparent")
         bottom.pack(side="bottom", fill="x", pady=8)
@@ -163,6 +173,7 @@ class PhantomTankGUI:
     def _refresh_icons(self):
         self._load_icons()
         self.btn_home.configure(image=self._icons["home"])
+        self.btn_preview.configure(image=self._icons["preview"])
         self.btn_theme.configure(image=self._icons["theme"])
         self.btn_about.configure(image=self._icons["about"])
 
@@ -174,7 +185,7 @@ class PhantomTankGUI:
 
         # 主页
         self.page_home = ctk.CTkFrame(self.content_frame, fg_color="transparent")
-        self.page_home.grid_columnconfigure(0, weight=1)
+        self.page_home.grid_columnconfigure(0, weight=1, uniform="preview")
         self.page_home.grid_columnconfigure(1, weight=1, uniform="preview")
         self.page_home.grid_rowconfigure(0, weight=1)
         self.page_home.grid_rowconfigure(1, weight=0)
@@ -183,14 +194,20 @@ class PhantomTankGUI:
         # 关于页
         self.page_about = ctk.CTkFrame(self.content_frame, fg_color="transparent")
 
+        # 预览页
+        self.page_preview = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+
         self._build_page_home()
         self._build_page_about()
+        self._build_page_preview()
 
     def _show_page(self, name: str):
-        for p in (self.page_home, self.page_about):
+        for p in (self.page_home, self.page_about, self.page_preview):
             p.pack_forget()
         if name == "home":
             self.page_home.pack(fill="both", expand=True, padx=6, pady=6)
+        elif name == "preview":
+            self.page_preview.pack(fill="both", expand=True, padx=6, pady=6)
         else:
             self.page_about.pack(fill="both", expand=True)
         self._current_page = name
@@ -198,7 +215,8 @@ class PhantomTankGUI:
 
     def _update_nav_active(self):
         active_color = ("gray75", "gray30")
-        for btn, page in [(self.btn_home, "home"), (self.btn_about, "about")]:
+        for btn, page in [(self.btn_home, "home"), (self.btn_preview, "preview"),
+                          (self.btn_about, "about")]:
             if self._current_page == page:
                 btn.configure(fg_color=active_color)
             else:
@@ -243,7 +261,89 @@ class PhantomTankGUI:
                          ).grid(row=i, column=0, sticky="e", padx=(0, 8), pady=2)
             ctk.CTkLabel(info_frame, text=value, font=ctk.CTkFont(size=13),
                          text_color=("gray50", "gray60"),
-                         ).grid(row=i, column=1, sticky="w", pady=2)
+                          ).grid(row=i, column=1, sticky="w", pady=2)
+
+    def _build_page_preview(self):
+        """构建预览页面"""
+        pv = self.page_preview
+        pv.grid_rowconfigure(0, weight=0)
+        pv.grid_rowconfigure(1, weight=1)
+        pv.grid_columnconfigure(0, weight=1)
+        pv.grid_columnconfigure(1, weight=1, uniform="preview")
+
+        top = ctk.CTkFrame(pv, fg_color="transparent")
+        top.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 6))
+
+        self.preview_file_label = ctk.CTkLabel(
+            top, text="未选择文件", font=ctk.CTkFont(size=12),
+            text_color=("gray50", "gray60"))
+        self.preview_file_label.pack(side="left", padx=(0, 8))
+
+        ctk.CTkButton(top, text="选择文件", width=80,
+                      command=self._select_preview_file).pack(side="left")
+
+        self.preview_surface_label = ctk.CTkLabel(pv, text="表图效果（白底）",
+                                                  text_color="gray50")
+        self.preview_surface_label.grid(row=1, column=0, sticky="nsew", padx=(0, 3))
+        self.preview_surface_label.bind("<Configure>",
+                                        lambda e: self._refresh_preview_images())
+
+        self.preview_inner_label = ctk.CTkLabel(pv, text="里图效果（黑底）",
+                                                text_color="gray50")
+        self.preview_inner_label.grid(row=1, column=1, sticky="nsew", padx=(3, 0))
+        self.preview_inner_label.bind("<Configure>",
+                                      lambda e: self._refresh_preview_images())
+
+    def _select_preview_file(self):
+        export = self.export_dir_var.get().strip()
+        initial_dir = export if export and Path(export).exists() else str(Path.cwd())
+        file_path = filedialog.askopenfilename(
+            title="选择 PNG 文件预览",
+            initialdir=initial_dir,
+            filetypes=[("PNG 文件", "*.png"), ("所有文件", "*.*")],
+        )
+        if file_path:
+            self._load_preview(file_path)
+
+    def _load_preview(self, file_path: str):
+        """加载 PNG 并生成白底/黑底预览"""
+        try:
+            img = Image.open(file_path).convert("RGBA")
+            w, h = img.size
+            self.preview_file_label.configure(text=Path(file_path).name)
+
+            white_bg = Image.new("RGBA", (w, h), (255, 255, 255, 255))
+            black_bg = Image.new("RGBA", (w, h), (0, 0, 0, 255))
+
+            self._preview_surface_img = Image.alpha_composite(white_bg, img)
+            self._preview_inner_img = Image.alpha_composite(black_bg, img)
+
+            self._refresh_preview_images()
+        except Exception as e:
+            messagebox.showerror("错误", f"无法加载预览: {e}")
+
+    def _refresh_preview_images(self):
+        if not getattr(self, "_preview_surface_img", None):
+            return
+        try:
+            def _fit(img, label):
+                lw = max(label.winfo_width(), 1)
+                lh = max(label.winfo_height(), 1)
+                lw = max(lw - 20, 50)
+                lh = max(lh - 20, 50)
+                preview = img.copy()
+                preview.thumbnail((lw, lh), Image.NEAREST)
+                return ImageTk.PhotoImage(preview)
+
+            sp = _fit(self._preview_surface_img, self.preview_surface_label)
+            ip = _fit(self._preview_inner_img, self.preview_inner_label)
+
+            self.preview_surface_label.configure(image=sp, text="")
+            self.preview_surface_label.image = sp
+            self.preview_inner_label.configure(image=ip, text="")
+            self.preview_inner_label.image = ip
+        except Exception:
+            pass
 
     # ==================== 预览区 ====================
 
@@ -383,11 +483,8 @@ class PhantomTankGUI:
 
     def _toggle_theme(self):
         current = ctk.get_appearance_mode()
-        ctk.set_appearance_mode("dark" if current == "Light" else "light")
-        self._refresh_icons()
-
-    def _set_appearance(self, mode: str):
-        ctk.set_appearance_mode(mode)
+        target = "dark" if current == "Light" else "light"
+        ctk.set_appearance_mode(target)
         self._refresh_icons()
 
     # ==================== 事件处理 ====================
