@@ -1,21 +1,6 @@
 """
 PhantomTank GUI 界面模块
-基于 customtkinter 构建的现代化跨平台图形界面
-
-布局概览：
-    ┌─────────────────────────────────────────┐
-    │  表图 (表面预览)  │  里图 (隐藏预览)      │
-    │                   │                      │
-    │  [选择表图]       │  [选择里图]           │
-    ├─────────────────────────────────────────┤
-    │  亮度增强 ──[====]  亮度削减 ──[====]    │
-    │  导出目录 [________] [浏览]               │
-    ├─────────────────────────────────────────┤
-    │  [开始合成]  [打开保存目录]                │
-    ├─────────────────────────────────────────┤
-    │  ████████████████████░░░░░░░            │
-    │  就绪                                    │
-    └─────────────────────────────────────────┘
+基于 customtkinter 构建的现代化图形界面，左侧图标导航栏 + 无边框窗口
 """
 
 from __future__ import annotations
@@ -26,33 +11,35 @@ import subprocess
 import sys
 import threading
 from pathlib import Path
-from tkinter import Menu, filedialog, messagebox, StringVar, BooleanVar
+from tkinter import filedialog, messagebox, StringVar
+import warnings
 from typing import Optional
 
-import warnings
 import customtkinter as ctk
 from PIL import Image, ImageTk
-
-warnings.filterwarnings("ignore", message=".*CTkImage.*")
 
 from config import Config
 from logger import init_logger
 from image_processor import process_phantom_tank
+from icons import get_icons
 
 TEMP_DIR = Path("temp")
 THUMB_DIR = Path(os.environ.get("TEMP", "")) / "PhantomTank" / "thumbnails"
-THUMB_MAX = 1600  # 缩略图最长边像素
+THUMB_MAX = 800  # 缩略图最长边像素
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("dark-blue")
+warnings.filterwarnings("ignore", message=".*CTkImage.*")
+
+NAV_WIDTH = 56  # 导航栏宽度
 
 
 class PhantomTankGUI:
     """幻影坦克主 GUI 窗口"""
 
-    def __init__(self):
+    def __init__(self, debug_mode: bool = False):
         self.config = Config()
-        self.logger = init_logger(self.config.debug_mode)
+        self.logger = init_logger(debug_mode)
         self.logger.info("PhantomTank GUI 启动")
 
         self._enable_dpi_awareness()
@@ -64,16 +51,20 @@ class PhantomTankGUI:
         self.last_output_path: Optional[Path] = None
         self._progress_anim_id: str | None = None
         self._progress_value: float = 0.0
+        self._icons: dict[str, ctk.CTkImage] = {}
+        self._current_page: str = "home"
 
         TEMP_DIR.mkdir(parents=True, exist_ok=True)
         self._cleanup_thumbnails()
 
         self._setup_window()
-        self._build_ui()
+        self._build_nav_bar()
+        self._build_pages()
         self._load_config_to_ui()
 
         self.root.update_idletasks()
         self._apply_initial_geometry()
+        self._show_page("home")
 
     @staticmethod
     def _enable_dpi_awareness():
@@ -90,7 +81,6 @@ class PhantomTankGUI:
                 pass
 
     def _cleanup_thumbnails(self):
-        """启动时清空缩略图缓存目录（彻底删除，不进回收站）"""
         try:
             if THUMB_DIR.exists():
                 shutil.rmtree(str(THUMB_DIR))
@@ -99,18 +89,20 @@ class PhantomTankGUI:
             pass
 
     def _make_thumbnail(self, image: Image.Image) -> Image.Image:
-        """为原图生成缩略图，保存到缓存目录并返回内存中的缩略图"""
         thumb = image.copy()
         thumb.thumbnail((THUMB_MAX, THUMB_MAX), Image.LANCZOS)
         name = f"{id(image)}_{os.getpid()}.png"
         thumb.save(str(THUMB_DIR / name), "PNG")
         return thumb
 
+    # ==================== 窗口设置 ====================
+
     def _setup_window(self):
         self.root = ctk.CTk()
         self.root.title("PhantomTank - 幻影坦克图片合成工具")
         self.root.resizable(True, True)
-        self.root.minsize(720, 560)
+        self.root.minsize(640, 500)
+
 
     def _apply_initial_geometry(self):
         sw = self.root.winfo_screenwidth()
@@ -121,91 +113,170 @@ class PhantomTankGUI:
         y = (sh - h) // 2
         self.root.geometry(f"{w}x{h}+{x}+{y}")
 
-    # ==================== UI 构建 ====================
+    # ==================== 导航栏 ====================
 
-    def _build_ui(self):
-        self.root.grid_columnconfigure(0, weight=1, uniform="preview")
-        self.root.grid_columnconfigure(1, weight=1, uniform="preview")
-        self.root.grid_rowconfigure(0, weight=1)
-        self.root.grid_rowconfigure(1, weight=0)
-        self.root.grid_rowconfigure(2, weight=0)
+    def _build_nav_bar(self):
+        self.nav_frame = ctk.CTkFrame(
+            self.root, width=NAV_WIDTH, corner_radius=0,
+            fg_color=("gray90", "gray17"),
+        )
+        self.nav_frame.pack(side="left", fill="y")
+        self.nav_frame.pack_propagate(False)
 
-        # 全局间距
-        pad = 8
+        self._load_icons()
 
-        self._build_menu()
+        # 主页按钮（向上对齐）
+        self.btn_home = ctk.CTkButton(
+            self.nav_frame, text="", image=self._icons["home"],
+            width=40, height=40, fg_color="transparent",
+            hover_color=("gray80", "gray25"),
+            command=lambda: self._show_page("home"),
+        )
+        self.btn_home.pack(side="top", pady=(8, 2))
+
+        # 底部区域
+        bottom = ctk.CTkFrame(self.nav_frame, fg_color="transparent")
+        bottom.pack(side="bottom", fill="x", pady=8)
+
+        self.btn_theme = ctk.CTkButton(
+            bottom, text="", image=self._icons["theme"],
+            width=40, height=40, fg_color="transparent",
+            hover_color=("gray80", "gray25"),
+            command=self._toggle_theme,
+        )
+        self.btn_theme.pack(side="top", pady=2)
+
+        self.btn_about = ctk.CTkButton(
+            bottom, text="", image=self._icons["about"],
+            width=40, height=40, fg_color="transparent",
+            hover_color=("gray80", "gray25"),
+            command=lambda: self._show_page("about"),
+        )
+        self.btn_about.pack(side="top", pady=2)
+
+    def _load_icons(self):
+        pil_icons = get_icons(ctk.get_appearance_mode() == "Light")
+        for name, pil_img in pil_icons.items():
+            self._icons[name] = ctk.CTkImage(
+                light_image=pil_img, dark_image=pil_img, size=(24, 24))
+
+    def _refresh_icons(self):
+        self._load_icons()
+        self.btn_home.configure(image=self._icons["home"])
+        self.btn_theme.configure(image=self._icons["theme"])
+        self.btn_about.configure(image=self._icons["about"])
+
+    # ==================== 页面系统 ====================
+
+    def _build_pages(self):
+        self.content_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        self.content_frame.pack(side="left", fill="both", expand=True)
+
+        # 主页
+        self.page_home = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+        self.page_home.grid_columnconfigure(0, weight=1)
+        self.page_home.grid_columnconfigure(1, weight=1, uniform="preview")
+        self.page_home.grid_rowconfigure(0, weight=1)
+        self.page_home.grid_rowconfigure(1, weight=0)
+        self.page_home.grid_rowconfigure(2, weight=0)
+
+        # 关于页
+        self.page_about = ctk.CTkFrame(self.content_frame, fg_color="transparent")
+
+        self._build_page_home()
+        self._build_page_about()
+
+    def _show_page(self, name: str):
+        for p in (self.page_home, self.page_about):
+            p.pack_forget()
+        if name == "home":
+            self.page_home.pack(fill="both", expand=True, padx=6, pady=6)
+        else:
+            self.page_about.pack(fill="both", expand=True)
+        self._current_page = name
+        self._update_nav_active()
+
+    def _update_nav_active(self):
+        active_color = ("gray75", "gray30")
+        for btn, page in [(self.btn_home, "home"), (self.btn_about, "about")]:
+            if self._current_page == page:
+                btn.configure(fg_color=active_color)
+            else:
+                btn.configure(fg_color="transparent")
+
+    # ==================== 主页 ====================
+
+    def _build_page_home(self):
+        """构建主页内容（原 _build_ui 内容）"""
+        pad = 6
         self._build_preview_area(pad)
         self._build_settings_area(pad)
         self._build_bottom_bar(pad)
 
-    def _build_menu(self):
-        menubar = Menu(self.root, font=("Microsoft YaHei UI", 10))
-        self.root.config(menu=menubar)
+    def _build_page_about(self):
+        """构建关于页面"""
+        about = self.page_about
+        about.grid_rowconfigure(0, weight=1)
+        about.grid_rowconfigure(1, weight=1)
+        about.grid_rowconfigure(2, weight=1)
+        about.grid_columnconfigure(0, weight=1)
 
-        file_menu = Menu(menubar, tearoff=0, font=("Microsoft YaHei UI", 10))
-        menubar.add_cascade(label=" 文件 ", menu=file_menu)
-        file_menu.add_command(label="选择表图...", command=self._select_surface)
-        file_menu.add_command(label="选择里图...", command=self._select_inner)
-        file_menu.add_separator()
-        file_menu.add_command(label="退出", command=lambda: self.root.destroy())
+        ctk.CTkLabel(
+            about, text="PhantomTank",
+            font=ctk.CTkFont(size=28, weight="bold"),
+        ).grid(row=0, column=0, sticky="s", pady=(0, 4))
 
-        view_menu = Menu(menubar, tearoff=0, font=("Microsoft YaHei UI", 10))
-        menubar.add_cascade(label=" 查看 ", menu=view_menu)
-        self._appearance_var = StringVar(value="light")
-        view_menu.add_radiobutton(
-            label="浅色模式", variable=self._appearance_var,
-            value="light", command=lambda: self._set_appearance("light"))
-        view_menu.add_radiobutton(
-            label="暗色模式", variable=self._appearance_var,
-            value="dark", command=lambda: self._set_appearance("dark"))
+        ctk.CTkLabel(
+            about, text="幻影坦克图片合成工具",
+            font=ctk.CTkFont(size=14),
+            text_color=("gray50", "gray60"),
+        ).grid(row=1, column=0, sticky="n", pady=(4, 16))
 
-        debug_menu = Menu(menubar, tearoff=0, font=("Microsoft YaHei UI", 10))
-        menubar.add_cascade(label=" 调试 ", menu=debug_menu)
-        self.debug_var = BooleanVar(value=False)
-        debug_menu.add_checkbutton(
-            label="启用调试日志", variable=self.debug_var,
-            command=self._on_debug_toggle)
+        info_frame = ctk.CTkFrame(about, fg_color="transparent")
+        info_frame.grid(row=2, column=0, sticky="n")
+        lines = [
+            ("版本号", "2.0.0-alpha"),
+            ("作者", "YamaArashi"),
+        ]
+        for i, (label, value) in enumerate(lines):
+            ctk.CTkLabel(info_frame, text=f"{label}:", font=ctk.CTkFont(size=13, weight="bold"),
+                         ).grid(row=i, column=0, sticky="e", padx=(0, 8), pady=2)
+            ctk.CTkLabel(info_frame, text=value, font=ctk.CTkFont(size=13),
+                         text_color=("gray50", "gray60"),
+                         ).grid(row=i, column=1, sticky="w", pady=2)
 
-    def _set_appearance(self, mode: str):
-        ctk.set_appearance_mode(mode)
+    # ==================== 预览区 ====================
 
     def _build_preview_area(self, pad: int):
-        """构建左右两个图片预览区"""
-        left_frame = self._section_frame("表图 (缩略图 / 封面)", 0, 0, pad)
-        right_frame = self._section_frame("里图 (原图 / 点开后可见)", 0, 1, pad)
-
-        label_font = ctk.CTkFont(size=13)
+        left_frame = self._section_frame(self.page_home,
+                                         "表图 (缩略图 / 封面)", 0, 0, pad)
+        right_frame = self._section_frame(self.page_home,
+                                          "里图 (原图 / 点开后可见)", 0, 1, pad)
 
         self.surface_preview_label = ctk.CTkLabel(
-            left_frame, text="", font=label_font, text_color="gray50",
+            left_frame, text="", text_color="gray50",
         )
         self.surface_preview_label.grid(row=1, column=0, sticky="nsew", padx=pad, pady=(4, 8))
 
-        ctk.CTkButton(
-            left_frame, text="选择表图", width=120,
-            font=ctk.CTkFont(size=13), corner_radius=8,
-            command=self._select_surface,
-        ).grid(row=2, column=0, pady=(0, pad))
+        ctk.CTkButton(left_frame, text="选择表图", width=120,
+                      command=self._select_surface).grid(row=2, column=0, pady=(0, pad))
 
         self.inner_preview_label = ctk.CTkLabel(
-            right_frame, text="", font=label_font, text_color="gray50",
+            right_frame, text="", text_color="gray50",
         )
         self.inner_preview_label.grid(row=1, column=0, sticky="nsew", padx=pad, pady=(4, 8))
 
-        ctk.CTkButton(
-            right_frame, text="选择里图", width=120,
-            font=ctk.CTkFont(size=13), corner_radius=8,
-            command=self._select_inner,
-        ).grid(row=2, column=0, pady=(0, pad))
+        ctk.CTkButton(right_frame, text="选择里图", width=120,
+                      command=self._select_inner).grid(row=2, column=0, pady=(0, pad))
 
         self.surface_preview_label.bind("<Configure>",
                                         lambda e: self._refresh_surface_preview())
         self.inner_preview_label.bind("<Configure>",
                                       lambda e: self._refresh_inner_preview())
 
-    def _section_frame(self, title: str, row: int, col: int, pad: int) -> ctk.CTkFrame:
-        """创建带标题的圆角分组区域，左右严格平分宽度"""
-        frame = ctk.CTkFrame(self.root, corner_radius=10, border_width=1,
+    def _section_frame(self, parent, title: str, row: int, col: int,
+                        pad: int) -> ctk.CTkFrame:
+        frame = ctk.CTkFrame(parent, corner_radius=10, border_width=1,
                              border_color=("gray75", "gray30"))
         margin = pad // 2
         frame.grid(row=row, column=col, sticky="nsew",
@@ -214,36 +285,32 @@ class PhantomTankGUI:
         frame.grid_rowconfigure(0, weight=0)
         frame.grid_rowconfigure(1, weight=1)
         frame.grid_rowconfigure(2, weight=0)
-
-        ctk.CTkLabel(
-            frame, text=title,
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).grid(row=0, column=0, sticky="w", padx=pad + 2, pady=(pad, 2))
+        ctk.CTkLabel(frame, text=title,
+                     font=ctk.CTkFont(size=14, weight="bold")).grid(
+            row=0, column=0, sticky="w", padx=pad + 2, pady=(pad, 2))
         return frame
 
+    # ==================== 设置区 ====================
+
     def _build_settings_area(self, pad: int):
-        """构建设置参数区"""
-        settings = ctk.CTkFrame(self.root, corner_radius=10, border_width=1,
+        settings = ctk.CTkFrame(self.page_home, corner_radius=10, border_width=1,
                                 border_color=("gray75", "gray30"))
         settings.grid(row=1, column=0, columnspan=2, sticky="ew",
                       padx=pad, pady=(0, pad))
         settings.grid_columnconfigure(1, weight=1)
 
-        ctk.CTkLabel(
-            settings, text="处理参数",
-            font=ctk.CTkFont(size=14, weight="bold"),
-        ).grid(row=0, column=0, columnspan=3, sticky="w",
-               padx=pad + 2, pady=(pad, 4))
+        ctk.CTkLabel(settings, text="处理参数",
+                     font=ctk.CTkFont(size=14, weight="bold")).grid(
+            row=0, column=0, columnspan=3, sticky="w",
+            padx=pad + 2, pady=(pad, 4))
 
         row = 1
-        entry_font = ctk.CTkFont(size=13)
+        ef = ctk.CTkFont(size=13)
 
-        # 亮度增强
-        ctk.CTkLabel(settings, text="亮度增强 (表图)", font=entry_font).grid(
+        ctk.CTkLabel(settings, text="亮度增强 (表图)", font=ef).grid(
             row=row, column=0, sticky="w", padx=(pad + 6, pad), pady=6)
         self.slider_enhance = ctk.CTkSlider(
             settings, from_=0, to=100, number_of_steps=10,
-            corner_radius=4, button_corner_radius=8,
             command=lambda v: self._on_enhance_change(v),
         )
         self.slider_enhance.grid(row=row, column=1, sticky="ew", padx=(0, pad), pady=6)
@@ -253,12 +320,10 @@ class PhantomTankGUI:
         self.brightness_enhance_label.grid(row=row, column=2, padx=(0, pad + 4))
         row += 1
 
-        # 亮度削减
-        ctk.CTkLabel(settings, text="亮度削减 (里图)", font=entry_font).grid(
+        ctk.CTkLabel(settings, text="亮度削减 (里图)", font=ef).grid(
             row=row, column=0, sticky="w", padx=(pad + 6, pad), pady=6)
         self.slider_reduce = ctk.CTkSlider(
             settings, from_=-100, to=0, number_of_steps=10,
-            corner_radius=4, button_corner_radius=8,
             command=lambda v: self._on_reduce_change(v),
         )
         self.slider_reduce.grid(row=row, column=1, sticky="ew", padx=(0, pad), pady=6)
@@ -268,29 +333,25 @@ class PhantomTankGUI:
         self.brightness_reduce_label.grid(row=row, column=2, padx=(0, pad + 4))
         row += 1
 
-        # 分隔线
         sep = ctk.CTkFrame(settings, height=2, fg_color=("gray75", "gray35"))
         sep.grid(row=row, column=0, columnspan=3, sticky="ew",
                  padx=pad + 4, pady=(8, 4))
         row += 1
 
-        # 导出目录
-        ctk.CTkLabel(settings, text="导出目录", font=entry_font).grid(
+        ctk.CTkLabel(settings, text="导出目录", font=ef).grid(
             row=row, column=0, sticky="w", padx=(pad + 6, pad), pady=8)
         self.export_dir_var = StringVar()
-        ctk.CTkEntry(
-            settings, textvariable=self.export_dir_var,
-            font=entry_font, corner_radius=6,
-        ).grid(row=row, column=1, sticky="ew", padx=(0, pad), pady=8)
-        ctk.CTkButton(
-            settings, text="浏览", width=60,
-            font=ctk.CTkFont(size=12), corner_radius=6,
-            command=self._browse_export_dir,
-        ).grid(row=row, column=2, padx=(0, pad + 4), pady=8)
+        ctk.CTkEntry(settings, textvariable=self.export_dir_var, font=ef,
+                     corner_radius=6).grid(row=row, column=1, sticky="ew",
+                                           padx=(0, pad), pady=8)
+        ctk.CTkButton(settings, text="浏览", width=60,
+                      command=self._browse_export_dir).grid(
+            row=row, column=2, padx=(0, pad + 4), pady=8)
+
+    # ==================== 底部栏 ====================
 
     def _build_bottom_bar(self, pad: int):
-        """构建底部按钮区 + 进度条 + 状态"""
-        bar = ctk.CTkFrame(self.root, corner_radius=10, border_width=1,
+        bar = ctk.CTkFrame(self.page_home, corner_radius=10, border_width=1,
                            border_color=("gray75", "gray30"))
         bar.grid(row=2, column=0, columnspan=2, sticky="ew",
                  padx=pad, pady=(0, pad))
@@ -298,16 +359,13 @@ class PhantomTankGUI:
         bar.grid_columnconfigure(1, weight=0)
         bar.grid_columnconfigure(2, weight=1)
 
-        self.btn_process = ctk.CTkButton(
-            bar, text="开始合成", width=100,
-            command=self._start_process,
-        )
+        self.btn_process = ctk.CTkButton(bar, text="开始合成", width=100,
+                                         command=self._start_process)
         self.btn_process.grid(row=0, column=0, padx=(pad, 4), pady=pad)
 
         self.btn_open_folder = ctk.CTkButton(
             bar, text="打开保存目录", width=100,
-            command=self._open_save_folder, state="disabled",
-        )
+            command=self._open_save_folder, state="disabled")
         self.btn_open_folder.grid(row=0, column=1, padx=4, pady=pad)
 
         self.progress_bar = ctk.CTkProgressBar(bar, height=12)
@@ -316,11 +374,21 @@ class PhantomTankGUI:
         self.progress_bar.set(0)
 
         self.status_var = StringVar(value="就绪")
-        ctk.CTkLabel(
-            bar, textvariable=self.status_var, anchor="w",
-            text_color=("gray50", "gray60"),
-        ).grid(row=1, column=0, columnspan=3, sticky="ew",
-               padx=pad + 4, pady=(0, pad))
+        ctk.CTkLabel(bar, textvariable=self.status_var, anchor="w",
+                     text_color=("gray50", "gray60")).grid(
+            row=1, column=0, columnspan=3, sticky="ew",
+            padx=pad + 4, pady=(0, pad))
+
+    # ==================== 主题 ====================
+
+    def _toggle_theme(self):
+        current = ctk.get_appearance_mode()
+        ctk.set_appearance_mode("dark" if current == "Light" else "light")
+        self._refresh_icons()
+
+    def _set_appearance(self, mode: str):
+        ctk.set_appearance_mode(mode)
+        self._refresh_icons()
 
     # ==================== 事件处理 ====================
 
@@ -329,12 +397,6 @@ class PhantomTankGUI:
 
     def _on_reduce_change(self, value):
         self.brightness_reduce_label.configure(text=str(int(round(value))))
-
-    def _on_debug_toggle(self):
-        enabled = self.debug_var.get()
-        self.logger.info(f"调试模式: {'开启' if enabled else '关闭'}")
-        self.config.debug_mode = enabled
-        self.config.save()
 
     def _select_surface(self):
         file_path = filedialog.askopenfilename(
@@ -372,7 +434,6 @@ class PhantomTankGUI:
 
     def _preview_for_label(self, thumb: Image.Image,
                            label: ctk.CTkLabel) -> ImageTk.PhotoImage | None:
-        """根据 Label 尺寸从内存缩略图生成预览"""
         max_w = max(label.winfo_width(), 1)
         max_h = max(label.winfo_height(), 1)
         max_w = max(max_w - 10, 10)
@@ -387,12 +448,10 @@ class PhantomTankGUI:
                 ratio = min(max_w / pw, max_h / ph)
                 preview = thumb.resize(
                     (int(pw * ratio), int(ph * ratio)), Image.NEAREST)
-
             if preview.mode == "RGBA":
                 bg = Image.new("RGBA", preview.size, (255, 255, 255, 255))
                 bg.paste(preview, (0, 0), preview)
                 preview = bg.convert("RGB")
-
             return ImageTk.PhotoImage(preview)
         except Exception:
             return None
@@ -455,10 +514,8 @@ class PhantomTankGUI:
             red = float(self.slider_reduce.get())
             export = self.export_dir_var.get().strip()
             output_path = process_phantom_tank(
-                surface=self.surface_image,
-                inner=self.inner_image,
-                brightness_enhancement=enh,
-                brightness_reduction=red,
+                surface=self.surface_image, inner=self.inner_image,
+                brightness_enhancement=enh, brightness_reduction=red,
                 output_path=export if export else "",
                 progress_callback=self._on_progress,
             )
@@ -474,7 +531,6 @@ class PhantomTankGUI:
         self.root.after(0, lambda: self._animate_progress(target, description))
 
     def _animate_progress(self, target: float, description: str):
-        """平滑过渡进度条到目标值"""
         self.status_var.set(f"处理中: {description}")
         diff = target - self._progress_value
         step = max(abs(diff) * 0.25, 0.02)
@@ -500,16 +556,13 @@ class PhantomTankGUI:
         messagebox.showerror("处理失败", f"合成过程中发生错误:\n{error_msg}")
 
     def _set_processing_state(self, processing: bool):
-        state = "disabled" if processing else "normal"
-        self.btn_process.configure(state=state)
+        self.btn_process.configure(state="disabled" if processing else "normal")
 
     def _open_save_folder(self):
-        """打开保存目录；若文件存在则选中，否则仅打开目录"""
         export = self.export_dir_var.get().strip()
         if not export:
             return
         target_dir = Path(export)
-
         if self.last_output_path and self.last_output_path.exists():
             path_str = str(self.last_output_path.resolve())
             self.logger.info(f"打开并选中文件: {path_str}")
@@ -548,7 +601,6 @@ class PhantomTankGUI:
         self.slider_enhance.set(int(self.config.brightness_enhancement))
         self.slider_reduce.set(int(self.config.brightness_reduction))
         self.export_dir_var.set(self.config.export_directory)
-        self.debug_var.set(self.config.debug_mode)
         if self.config.export_directory:
             self.btn_open_folder.configure(state="normal")
         self._on_enhance_change(self.slider_enhance.get())
@@ -558,14 +610,12 @@ class PhantomTankGUI:
         self.config.brightness_enhancement = float(self.slider_enhance.get())
         self.config.brightness_reduction = float(self.slider_reduce.get())
         self.config.export_directory = self.export_dir_var.get().strip()
-        self.config.debug_mode = self.debug_var.get()
         self.config.save()
         self.logger.debug("配置已保存")
 
     # ==================== 启动 ====================
 
     def run(self):
-        """启动 GUI 主循环，退出时清空缩略图缓存"""
         self.root.protocol("WM_DELETE_WINDOW", lambda: self.root.destroy())
         self.root.mainloop()
         self._cleanup_thumbnails()
