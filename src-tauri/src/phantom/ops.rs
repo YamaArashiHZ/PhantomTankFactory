@@ -48,22 +48,23 @@ pub fn grayscale_keep_alpha(image: &RgbaImage) -> RgbaImage {
     out
 }
 
-/// 亮度调整：>0 向白靠拢；<=0 各通道减半（与参考实现一致）。
+/// 亮度调整：>0 向白色线性插值；<0 向黑色线性插值；=0 不变。
+/// 与旧算法在 lightness=±50 时结果一致，但在其他值下提供平滑连续的变化。
 pub fn adjust_brightness(image: &RgbaImage, lightness: f64) -> RgbaImage {
     let (w, h) = image.dimensions();
     let mut out = RgbaImage::new(w, h);
 
-    if lightness > 0.0 {
-        let factor = lightness / 100.0;
+    if lightness >= 0.0 {
+        let t = lightness / 100.0;
         for (x, y, px) in image.enumerate_pixels() {
-            let r = (((f64::from(px[0]) + 255.0) * factor).round() as u32).min(255) as u8;
-            let g = (((f64::from(px[1]) + 255.0) * factor).round() as u32).min(255) as u8;
-            let b = (((f64::from(px[2]) + 255.0) * factor).round() as u32).min(255) as u8;
-            out.put_pixel(x, y, Rgba([r, g, b, px[3]]));
+            let blend = |c: u8| (f64::from(c) + t * (255.0 - f64::from(c))).round() as u8;
+            out.put_pixel(x, y, Rgba([blend(px[0]), blend(px[1]), blend(px[2]), px[3]]));
         }
     } else {
+        let factor = 1.0 + lightness / 100.0;
         for (x, y, px) in image.enumerate_pixels() {
-            out.put_pixel(x, y, Rgba([px[0] / 2, px[1] / 2, px[2] / 2, px[3]]));
+            let dim = |c: u8| (f64::from(c) * factor).round() as u8;
+            out.put_pixel(x, y, Rgba([dim(px[0]), dim(px[1]), dim(px[2]), px[3]]));
         }
     }
     out
@@ -199,19 +200,30 @@ mod tests {
     // ---------- adjust_brightness ----------
 
     #[test]
-    fn brightness_positive() {
+    fn brightness_positive_halfway() {
         let img = RgbaImage::from_pixel(1, 1, px(100, 0, 255, 200));
         let out = adjust_brightness(&img, 50.0);
         let p = out.get_pixel(0, 0);
-        let exp = |c: u8| (((c as f64 + 255.0) * 0.5).round() as u32).min(255) as u8;
-        assert_eq!(p[0], exp(100));
-        assert_eq!(p[1], exp(0));
-        assert_eq!(p[2], exp(255));
+        let blend = |c: u8| (f64::from(c) + 0.5 * (255.0 - f64::from(c))).round() as u8;
+        assert_eq!(p[0], blend(100));
+        assert_eq!(p[1], blend(0));
+        assert_eq!(p[2], blend(255));
         assert_eq!(p[3], 200);
     }
 
     #[test]
-    fn brightness_negative() {
+    fn brightness_positive_quarter() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 0, 200, 255));
+        let out = adjust_brightness(&img, 25.0);
+        let p = out.get_pixel(0, 0);
+        let blend = |c: u8| (f64::from(c) + 0.25 * (255.0 - f64::from(c))).round() as u8;
+        assert_eq!(p[0], blend(100));
+        assert_eq!(p[1], blend(0));
+        assert_eq!(p[2], blend(200));
+    }
+
+    #[test]
+    fn brightness_negative_halfway() {
         let img = RgbaImage::from_pixel(1, 1, px(200, 100, 50, 77));
         let out = adjust_brightness(&img, -50.0);
         let p = out.get_pixel(0, 0);
@@ -219,11 +231,35 @@ mod tests {
     }
 
     #[test]
-    fn brightness_zero_uses_halving() {
+    fn brightness_negative_quarter() {
+        let img = RgbaImage::from_pixel(1, 1, px(200, 100, 50, 77));
+        let out = adjust_brightness(&img, -25.0);
+        let p = out.get_pixel(0, 0);
+        assert_eq!((p[0], p[1], p[2], p[3]), (150, 75, 38, 77));
+    }
+
+    #[test]
+    fn brightness_zero_is_identity() {
         let img = RgbaImage::from_pixel(1, 1, px(200, 100, 50, 77));
         let out = adjust_brightness(&img, 0.0);
         let p = out.get_pixel(0, 0);
-        assert_eq!((p[0], p[1], p[2], p[3]), (100, 50, 25, 77));
+        assert_eq!((p[0], p[1], p[2], p[3]), (200, 100, 50, 77));
+    }
+
+    #[test]
+    fn brightness_max_is_white() {
+        let img = RgbaImage::from_pixel(1, 1, px(50, 100, 150, 99));
+        let out = adjust_brightness(&img, 100.0);
+        let p = out.get_pixel(0, 0);
+        assert_eq!((p[0], p[1], p[2], p[3]), (255, 255, 255, 99));
+    }
+
+    #[test]
+    fn brightness_min_is_black() {
+        let img = RgbaImage::from_pixel(1, 1, px(50, 100, 150, 99));
+        let out = adjust_brightness(&img, -100.0);
+        let p = out.get_pixel(0, 0);
+        assert_eq!((p[0], p[1], p[2], p[3]), (0, 0, 0, 99));
     }
 
     // ---------- invert_keep_alpha ----------
