@@ -27,5 +27,8 @@ dist-ssr
 temp/*
 !temp/.gitkeep
 
+# Local reference only (not part of the Tauri app)
+ref/
+
 # Rust
 src-tauri/target

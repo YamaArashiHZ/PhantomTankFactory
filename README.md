@@ -1,7 +1,65 @@
-# Tauri + Vue + TypeScript
+# PhantomTank Factory
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+幻影坦克合成工具 —— 选择表图与里图，生成「缩略图看一张、点开看另一张」的 PNG。
 
-## Recommended IDE Setup
+> 本仓库当前主开发线为 **Tauri 2 + Vue 3 + Rust** 重写版。
 
-- [VS Code](https://code.visualstudio.com/) + [Vue - Official](https://marketplace.visualstudio.com/items?itemName=Vue.volar) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+## 功能
+
+- 表图 / 里图选择与预览
+- 亮度参数调节（可恢复默认）
+- 实时效果预览（白底表图 / 黑底里图，可开关与清晰度档位）
+- 导出 PNG，打开保存目录
+- 效果查看页：对已生成图片做白/黑底预览
+- 深浅色主题、配置持久化
+
+## 技术栈
+
+- **桌面壳**：Tauri 2
+- **前端**：Vue 3、TypeScript、Naive UI、Vite
+- **图像处理**：Rust（`image` crate）
+- **包管理**：pnpm
+
+## 环境要求
+
+- Node.js（LTS）+ pnpm
+- Rust（stable）
+- Windows：Visual Studio Build Tools（C++ 桌面开发）
+- WebView2（Win10/11 通常已自带）
+
+## 开发
+
+```bash
+pnpm install
+pnpm tauri dev
+```
+
+## 打包
+
+```bash
+pnpm tauri build
+```
+
+Windows 安装包一般在：
+
+```text
+src-tauri/target/release/bundle/
+```
+
+## 配置文件位置
+
+用户配置由 Tauri Store 保存，Windows 大致路径：
+
+```text
+%APPDATA%\com.phantomtank.factory\settings.json
+```
+
+## 作者
+
+- YamaArashi
+- GitHub：https://github.com/YamaArashiHZ/PhantomTankFactory
+- Bilibili：https://space.bilibili.com/319279623
+
+## 许可证
+
+[MIT](./LICENSE)
