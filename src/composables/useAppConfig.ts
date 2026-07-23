@@ -18,7 +18,7 @@ function getStore() {
   return store;
 }
 
-function clampConfig(raw: Partial<AppConfig> | null | undefined): AppConfig {
+export function clampConfig(raw: Partial<AppConfig> | null | undefined): AppConfig {
   const next = { ...DEFAULT_CONFIG, ...(raw ?? {}) };
   if (
     typeof next.brightnessEnhancement !== "number" ||

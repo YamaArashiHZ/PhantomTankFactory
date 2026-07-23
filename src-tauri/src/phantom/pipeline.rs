@@ -222,3 +222,93 @@ pub fn preview_phantom_tank(
 
     Ok((rgba_to_data_url(&surface_fx)?, rgba_to_data_url(&inner_fx)?))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn solid_rgba(w: u32, h: u32, r: u8, g: u8, b: u8, a: u8) -> RgbaImage {
+        RgbaImage::from_pixel(w, h, Rgba([r, g, b, a]))
+    }
+
+    // ---------- downscale_max_edge ----------
+
+    #[test]
+    fn downscale_max_edge_no_resize() {
+        let img = solid_rgba(100, 80, 255, 0, 0, 255);
+        let out = downscale_max_edge(&img, 200);
+        assert_eq!(out.dimensions(), (100, 80));
+    }
+
+    #[test]
+    fn downscale_max_edge_resize_landscape() {
+        let img = solid_rgba(800, 600, 255, 0, 0, 255);
+        let out = downscale_max_edge(&img, 320);
+        let (w, h) = out.dimensions();
+        assert!(w <= 320);
+        assert!(h <= 320);
+        assert_eq!(w, 320);
+        assert!(h < 320);
+    }
+
+    #[test]
+    fn downscale_max_edge_resize_portrait() {
+        let img = solid_rgba(600, 800, 255, 0, 0, 255);
+        let out = downscale_max_edge(&img, 320);
+        let (w, h) = out.dimensions();
+        assert!(w <= 320);
+        assert!(h <= 320);
+        assert_eq!(h, 320);
+        assert!(w < 320);
+    }
+
+    // ---------- compose_phantom_tank ----------
+
+    #[test]
+    fn compose_does_not_panic() {
+        let surface = solid_rgba(4, 4, 255, 200, 150, 255);
+        let inner = solid_rgba(4, 4, 100, 50, 200, 255);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0);
+        assert_eq!(result.dimensions(), (4, 4));
+    }
+
+    #[test]
+    fn compose_different_sizes() {
+        let surface = solid_rgba(8, 6, 255, 0, 0, 255);
+        let inner = solid_rgba(2, 2, 0, 255, 0, 255);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0);
+        let (w, h) = result.dimensions();
+        assert!(w >= 2);
+        assert!(h >= 2);
+    }
+
+    // ---------- alpha_on_solid ----------
+
+    #[test]
+    fn alpha_on_white_shows_white_background() {
+        let fg = solid_rgba(2, 2, 0, 0, 0, 0);
+        let out = alpha_on_solid(&fg, 255, 255, 255);
+        for (_, _, p) in out.enumerate_pixels() {
+            assert_eq!((p[0], p[1], p[2], p[3]), (255, 255, 255, 255));
+        }
+    }
+
+    #[test]
+    fn alpha_on_black_shows_black_background() {
+        let fg = solid_rgba(2, 2, 0, 0, 0, 0);
+        let out = alpha_on_solid(&fg, 0, 0, 0);
+        for (_, _, p) in out.enumerate_pixels() {
+            assert_eq!((p[0], p[1], p[2], p[3]), (0, 0, 0, 255));
+        }
+    }
+
+    // ---------- rgba_to_data_url ----------
+
+    #[test]
+    fn rgba_to_data_url_format() {
+        let img = solid_rgba(1, 1, 255, 0, 0, 255);
+        let url = rgba_to_data_url(&img).unwrap();
+        assert!(url.starts_with("data:image/png;base64,"));
+        assert!(url.len() > "data:image/png;base64,".len());
+    }
+}

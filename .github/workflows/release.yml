@@ -72,6 +72,13 @@ jobs:
       - name: 安装前端依赖
         run: pnpm install --frozen-lockfile
 
+      - name: 前端测试
+        run: pnpm test
+
+      - name: Rust 测试
+        working-directory: src-tauri
+        run: cargo test
+
       # tauri-action 会：构建 → 签名 → 生成 latest.json → 创建 Release 并上传全部产物
       - name: 构建并发布（tauri-action）
         uses: tauri-apps/tauri-action@v0
