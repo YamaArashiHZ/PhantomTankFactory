@@ -32,12 +32,25 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "YamaArashi",
+    "copyright": "Copyright © 2026 YamaArashi",
+    "license": "MIT",
+    "shortDescription": "幻影坦克合成工具",
+    "longDescription": "PhantomTank Factory —— 选择表图与里图，生成缩略图与原图不同效果的幻影坦克 PNG。",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "windows": {
+      "nsis": {
+        "installerIcon": "icons/icon.ico",
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false,
+        "installMode": "currentUser"
+      }
+    }
   }
 }

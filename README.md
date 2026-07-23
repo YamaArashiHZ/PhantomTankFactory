@@ -4,6 +4,18 @@
 
 > 本仓库当前主开发线为 **Tauri 2 + Vue 3 + Rust** 重写版。
 
+## 下载安装（Windows）
+
+普通用户请直接从 **Latest Release** 下载安装包，无需自行编译：
+
+**→ [Latest Release](https://github.com/YamaArashiHZ/PhantomTankFactory/releases/latest)**
+
+1. 打开上方链接（或仓库页右侧 **Releases** → **Latest**）
+2. 下载 `PhantomTank Factory_x.x.x_x64-setup.exe`（NSIS 安装程序）
+3. 运行安装程序，按提示完成安装
+
+系统要求：Windows 10/11 x64，已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)（多数系统已自带）。
+
 ## 功能
 
 - 表图 / 里图选择与预览
@@ -20,7 +32,7 @@
 - **图像处理**：Rust（`image` crate）
 - **包管理**：pnpm
 
-## 环境要求
+## 环境要求（开发）
 
 - Node.js（LTS）+ pnpm
 - Rust（stable）
@@ -38,13 +50,17 @@ pnpm tauri dev
 
 ```bash
 pnpm tauri build
+# 或仅 NSIS 安装包：
+pnpm tauri build --bundles nsis
 ```
 
 Windows 安装包一般在：
 
 ```text
-src-tauri/target/release/bundle/
+src-tauri/target/release/bundle/nsis/
 ```
+
+示例文件名：`PhantomTank Factory_0.1.0_x64-setup.exe`
 
 ## 配置文件位置
 
