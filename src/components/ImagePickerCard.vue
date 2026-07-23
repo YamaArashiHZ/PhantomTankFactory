@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { NCard, NButton, NText, NIcon, NEmpty } from "naive-ui";
 import { ImageOutline, CloseCircleOutline } from "@vicons/ionicons5";
 import { convertFileSrc } from "@tauri-apps/api/core";
@@ -9,11 +9,17 @@ const props = defineProps<{
   title: string;
   hint: string;
   path: string | null;
+  /** 父级统一宽高比（两卡同步），未传则用默认 16:9 */
+  boxAspect?: number;
 }>();
 
 const emit = defineEmits<{
   "update:path": [value: string | null];
+  /** 图片自然尺寸变化；清除或无效时为 null */
+  "natural-size": [size: { width: number; height: number } | null];
 }>();
+
+const DEFAULT_ASPECT = 16 / 9;
 
 const previewUrl = computed(() => (props.path ? convertFileSrc(props.path) : ""));
 const fileName = computed(() => {
@@ -21,6 +27,35 @@ const fileName = computed(() => {
   const parts = props.path.replace(/\\/g, "/").split("/");
   return parts[parts.length - 1] || props.path;
 });
+
+const resolvedAspect = computed(() =>
+  props.boxAspect && props.boxAspect > 0 ? props.boxAspect : DEFAULT_ASPECT,
+);
+
+const previewBoxStyle = computed(() => {
+  const a = resolvedAspect.value;
+  return {
+    aspectRatio: String(a),
+    width: `min(100%, calc(min(72vh, 520px) * ${a}))`,
+    maxHeight: "min(72vh, 520px)",
+  };
+});
+
+watch(
+  () => props.path,
+  (p) => {
+    if (!p) emit("natural-size", null);
+  },
+);
+
+function onImgLoad(e: Event) {
+  const img = e.target as HTMLImageElement;
+  if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+    emit("natural-size", { width: img.naturalWidth, height: img.naturalHeight });
+  } else {
+    emit("natural-size", null);
+  }
+}
 
 async function pickImage() {
   const selected = await open({
@@ -40,6 +75,7 @@ async function pickImage() {
 
 function clear() {
   emit("update:path", null);
+  emit("natural-size", null);
 }
 </script>
 
@@ -62,6 +98,8 @@ function clear() {
 
     <div
       class="preview-box"
+      :class="{ empty: !path }"
+      :style="previewBoxStyle"
       @click="pickImage"
       role="button"
       tabindex="0"
@@ -69,10 +107,12 @@ function clear() {
     >
       <img
         v-if="path"
+        :key="path"
         :src="previewUrl"
         :alt="title"
         class="preview-img"
         draggable="false"
+        @load="onImgLoad"
       />
       <div v-else class="placeholder">
         <n-empty :description="hint" size="small">
@@ -96,26 +136,36 @@ function clear() {
 
 <style scoped>
 .picker-card {
-  height: 100%;
-  overflow: visible;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
 }
 
 .picker-card :deep(.n-card-header) {
-  overflow: visible;
+  overflow: hidden;
+}
+
+.picker-card :deep(.n-card-header__main) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .picker-card :deep(.n-card__content) {
-  overflow: visible !important;
+  overflow: hidden !important;
   display: flex;
   flex-direction: column;
   gap: 0;
+  min-width: 0;
 }
 
 .preview-box {
   position: relative;
-  width: 100%;
-  height: 220px;
-  min-height: 180px;
+  margin-inline: auto;
+  min-height: 160px;
+  height: auto;
   padding: 10px;
   border-radius: 12px;
   border: 1px dashed var(--border-color);
@@ -125,8 +175,16 @@ function clear() {
   justify-content: center;
   overflow: hidden;
   cursor: pointer;
-  transition: border-color 0.2s, background 0.2s;
+  transition:
+    border-color 0.2s,
+    background 0.2s,
+    width 0.2s ease,
+    aspect-ratio 0.2s ease;
   box-sizing: border-box;
+}
+
+.preview-box.empty {
+  /* 空状态也跟统一比例，保证两卡同高 */
 }
 
 .preview-box:hover {
@@ -157,11 +215,18 @@ function clear() {
   justify-content: space-between;
   gap: 10px;
   flex-shrink: 0;
+  min-width: 0;
+  width: 100%;
+}
+
+.footer :deep(.n-button) {
+  flex-shrink: 0;
 }
 
 .filename {
-  flex: 1;
+  flex: 1 1 0;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

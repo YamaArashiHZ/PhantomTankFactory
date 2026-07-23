@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
+import { ref, computed, watch } from "vue";
 import {
   NButton,
   NCard,
@@ -20,13 +20,58 @@ import BrightnessPanel from "../components/BrightnessPanel.vue";
 import { useAppConfig } from "../composables/useAppConfig";
 import type { ProcessResult } from "../types";
 
+/** 横/竖比例上限 16:9 → 宽高比夹在 9:16 ~ 16:9 */
+const ASPECT_MAX = 16 / 9;
+const ASPECT_MIN = 9 / 16;
+const DEFAULT_ASPECT = 16 / 9;
+
+type NaturalSize = { width: number; height: number };
+
+function clampAspect(width: number, height: number): number {
+  const raw = width / height;
+  return Math.min(ASPECT_MAX, Math.max(ASPECT_MIN, raw));
+}
+
 const message = useMessage();
 const { brightnessEnhancement, brightnessReduction, exportDirectory } = useAppConfig();
 
 const surfacePath = ref<string | null>(null);
 const innerPath = ref<string | null>(null);
+const surfaceNatural = ref<NaturalSize | null>(null);
+const innerNatural = ref<NaturalSize | null>(null);
 const processing = ref(false);
 const lastOutput = ref<string | null>(null);
+
+/**
+ * 两卡同步比例：各自 clamp 后取「更高」的一方（aspect 更小），
+ * 即容器尺寸取 max，保证竖图够大且两侧同高。
+ */
+const sharedBoxAspect = computed(() => {
+  const aspects: number[] = [];
+  if (surfaceNatural.value) {
+    aspects.push(clampAspect(surfaceNatural.value.width, surfaceNatural.value.height));
+  }
+  if (innerNatural.value) {
+    aspects.push(clampAspect(innerNatural.value.width, innerNatural.value.height));
+  }
+  if (aspects.length === 0) return DEFAULT_ASPECT;
+  return Math.min(...aspects);
+});
+
+watch(surfacePath, (p) => {
+  if (!p) surfaceNatural.value = null;
+});
+watch(innerPath, (p) => {
+  if (!p) innerNatural.value = null;
+});
+
+function onSurfaceNatural(s: NaturalSize | null) {
+  surfaceNatural.value = s;
+}
+
+function onInnerNatural(s: NaturalSize | null) {
+  innerNatural.value = s;
+}
 
 const canProcess = computed(
   () => !!surfacePath.value && !!innerPath.value && !processing.value,
@@ -95,11 +140,15 @@ async function revealOutput() {
           v-model:path="surfacePath"
           title="表图"
           hint="缩略图 / 未点开时显示"
+          :box-aspect="sharedBoxAspect"
+          @natural-size="onSurfaceNatural"
         />
         <ImagePickerCard
           v-model:path="innerPath"
           title="里图"
           hint="点开原图后显示"
+          :box-aspect="sharedBoxAspect"
+          @natural-size="onInnerNatural"
         />
       </div>
 
@@ -165,8 +214,16 @@ async function revealOutput() {
 
 .pickers {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  align-items: start;
+  width: 100%;
+}
+
+.pickers > * {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .export-row {
