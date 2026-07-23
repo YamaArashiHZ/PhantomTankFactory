@@ -12,6 +12,7 @@ import type { OverlayScrollbars } from "overlayscrollbars";
 import "overlayscrollbars/overlayscrollbars.css";
 import AppSidebar from "./components/AppSidebar.vue";
 import HomeView from "./views/HomeView.vue";
+import PreviewView from "./views/PreviewView.vue";
 import AboutView from "./views/AboutView.vue";
 import { useAppConfig, loadAppConfig } from "./composables/useAppConfig";
 import type { AppPage } from "./types";
@@ -188,8 +189,11 @@ onBeforeUnmount(() => {
             :events="osEvents"
           >
             <div class="app-main-inner">
-              <HomeView v-if="page === 'home'" />
-              <AboutView v-else />
+              <Transition name="page" mode="out-in">
+                <HomeView v-if="page === 'home'" key="home" />
+                <PreviewView v-else-if="page === 'preview'" key="preview" />
+                <AboutView v-else key="about" />
+              </Transition>
             </div>
           </OverlayScrollbarsComponent>
         </div>
@@ -239,6 +243,30 @@ onBeforeUnmount(() => {
   width: 100%;
   max-width: none;
   box-sizing: border-box;
+}
+
+/* 页面切换：淡出 + 轻微位移 */
+.page-enter-active,
+.page-leave-active {
+  transition:
+    opacity 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+    transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.page-enter-to,
+.page-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* 极简滚动条：固定 10px */

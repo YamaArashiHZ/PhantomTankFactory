@@ -18,10 +18,21 @@ body,
   overflow: hidden;
   font-family: var(--app-font);
   -webkit-font-smoothing: antialiased;
+  /* 禁用拖动选中文字（输入控件除外） */
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 body {
   background: transparent;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
 }
 
 .app-shell {

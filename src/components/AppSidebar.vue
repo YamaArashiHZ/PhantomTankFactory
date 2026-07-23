@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { NButton, NTooltip, NIcon } from "naive-ui";
-import { HomeOutline, InformationCircleOutline, MoonOutline, SunnyOutline } from "@vicons/ionicons5";
+import {
+  HomeOutline,
+  ImagesOutline,
+  InformationCircleOutline,
+  MoonOutline,
+  SunnyOutline,
+} from "@vicons/ionicons5";
 import type { AppPage, ThemeMode } from "../types";
 
 defineProps<{
@@ -35,6 +41,24 @@ const emit = defineEmits<{
           </n-button>
         </template>
         主页
+      </n-tooltip>
+
+      <n-tooltip placement="right" :delay="400">
+        <template #trigger>
+          <n-button
+            quaternary
+            circle
+            size="large"
+            :type="current === 'preview' ? 'primary' : 'default'"
+            :class="{ active: current === 'preview' }"
+            @click="emit('navigate', 'preview')"
+          >
+            <template #icon>
+              <n-icon :component="ImagesOutline" :size="22" />
+            </template>
+          </n-button>
+        </template>
+        效果查看
       </n-tooltip>
 
       <n-tooltip placement="right" :delay="400">

@@ -1,6 +1,6 @@
 export type ThemeMode = "light" | "dark";
 
-export type AppPage = "home" | "about";
+export type AppPage = "home" | "preview" | "about";
 
 /** 预览清晰度：低 320 / 中 640 / 高 1280 / 原图(0=不缩小) */
 export type PreviewQuality = "low" | "medium" | "high" | "original";
