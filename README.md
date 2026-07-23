@@ -11,7 +11,7 @@
 **→ [Latest Release](https://github.com/YamaArashiHZ/PhantomTankFactory/releases/latest)**
 
 1. 打开上方链接（或仓库页右侧 **Releases** → **Latest**）
-2. 下载 `PhantomTank Factory_x.x.x_x64-setup.exe`（NSIS 安装程序）
+2. 下载 `PhantomTank Factory_x.x.x_x64-setup.exe`（安装程序）
 3. 运行安装程序，按提示完成安装
 
 系统要求：Windows 10/11 x64，已安装 [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/)（多数系统已自带）。
@@ -19,11 +19,8 @@
 ## 功能
 
 - 表图 / 里图选择与预览
-- 亮度参数调节（可恢复默认）
+- 亮度参数调节
 - 实时效果预览（白底表图 / 黑底里图，可开关与清晰度档位）
-- 导出 PNG，打开保存目录
-- 效果查看页：对已生成图片做白/黑底预览
-- 深浅色主题、配置持久化
 
 ## 技术栈
 
@@ -74,7 +71,6 @@ src-tauri/target/release/bundle/nsis/
 
 - YamaArashi
 - GitHub：https://github.com/YamaArashiHZ/PhantomTankFactory
-- Bilibili：https://space.bilibili.com/319279623
 
 ## 许可证
 
