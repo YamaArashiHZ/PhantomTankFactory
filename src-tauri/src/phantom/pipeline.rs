@@ -1,5 +1,8 @@
+use std::collections::HashMap;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
+use std::sync::{LazyLock, Mutex};
+use std::time::SystemTime;
 
 use base64::{engine::general_purpose::STANDARD, Engine};
 use chrono::Local;
@@ -7,13 +10,17 @@ use image::{imageops, ImageFormat, ImageReader, Rgba, RgbaImage};
 
 use super::ops;
 
-
+// ==================== 错误类型 ====================
 
 #[derive(Debug, thiserror::Error)]
 pub enum ProcessError {
+    #[error("文件不存在: {0}")]
+    NotFound(String),
+    #[error("没有访问权限: {0}")]
+    Permission(String),
     #[error("无法打开图片: {0}")]
     Open(String),
-    #[error("无法解码图片: {0}")]
+    #[error("无法解码图片（文件可能损坏或格式不支持）: {0}")]
     Decode(String),
     #[error("无法保存图片: {0}")]
     Save(String),
@@ -23,16 +30,68 @@ pub enum ProcessError {
     Encode(String),
 }
 
+impl ProcessError {
+    /// 按 IO 错误类型映射为更具体的错误。
+    fn from_io(kind: std::io::ErrorKind, ctx: &str, path: &Path, err: &std::io::Error) -> Self {
+        let detail = format!("{ctx}: {} ({err})", path.display());
+        match kind {
+            std::io::ErrorKind::NotFound => Self::NotFound(detail),
+            std::io::ErrorKind::PermissionDenied => Self::Permission(detail),
+            _ => Self::Open(detail),
+        }
+    }
+}
+
+// ==================== 解码缓存 ====================
+
+/// 已解码图片缓存：路径 → (文件修改时间, RGBA)。
+/// 预览拖动滑条时反复调用同一对图片，缓存可避免重复 IO + 解码。
+static IMAGE_CACHE: LazyLock<Mutex<HashMap<PathBuf, (SystemTime, RgbaImage)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// 缓存条数上限（表图 + 里图为主，留冗余）。
+const CACHE_CAPACITY: usize = 4;
+
+fn file_mtime(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path).ok()?.modified().ok()
+}
+
 fn load_rgba(path: &Path) -> Result<RgbaImage, ProcessError> {
+    let canonical = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());
+    let mtime = file_mtime(path);
+
+    // 命中缓存（且文件未改动）则直接复用
+    if let Some(mt) = mtime {
+        if let Ok(cache) = IMAGE_CACHE.lock() {
+            if let Some((cached_mtime, img)) = cache.get(&canonical) {
+                if *cached_mtime == mt {
+                    return Ok(img.clone());
+                }
+            }
+        }
+    }
+
     let reader = ImageReader::open(path)
-        .map_err(|e| ProcessError::Open(format!("{} ({e})", path.display())))?
+        .map_err(|e| ProcessError::from_io(e.kind(), "打开", path, &e))?
         .with_guessed_format()
-        .map_err(|e| ProcessError::Open(format!("{} ({e})", path.display())))?;
+        .map_err(|e| ProcessError::from_io(e.kind(), "识别格式", path, &e))?;
     let img = reader
         .decode()
-        .map_err(|e| ProcessError::Decode(format!("{} ({e})", path.display())))?;
-    Ok(img.to_rgba8())
+        .map_err(|e| ProcessError::Decode(format!("{} ({e})", path.display())))?
+        .to_rgba8();
+
+    // 写入缓存；超出容量时整体清空（场景简单，清重建代价低）
+    if let (Some(mt), Ok(mut cache)) = (mtime, IMAGE_CACHE.lock()) {
+        if cache.len() >= CACHE_CAPACITY {
+            cache.clear();
+        }
+        cache.insert(canonical, (mt, img.clone()));
+    }
+
+    Ok(img)
 }
+
+// ==================== 图像处理 ====================
 
 /// 最长边限制，保持比例（预览加速）。
 fn downscale_max_edge(img: &RgbaImage, max_edge: u32) -> RgbaImage {
