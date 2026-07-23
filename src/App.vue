@@ -11,6 +11,7 @@ import { OverlayScrollbarsComponent } from "overlayscrollbars-vue";
 import type { OverlayScrollbars } from "overlayscrollbars";
 import "overlayscrollbars/overlayscrollbars.css";
 import AppSidebar from "./components/AppSidebar.vue";
+import UpdaterBootstrap from "./components/UpdaterBootstrap.vue";
 import HomeView from "./views/HomeView.vue";
 import PreviewView from "./views/PreviewView.vue";
 import AboutView from "./views/AboutView.vue";
@@ -170,6 +171,7 @@ onBeforeUnmount(() => {
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides" style="height: 100%">
     <n-notification-provider placement="bottom" :max="3" container-class="app-notify-bottom">
       <n-message-provider>
+        <UpdaterBootstrap v-if="ready" />
         <div
           v-if="ready"
           class="app-shell"

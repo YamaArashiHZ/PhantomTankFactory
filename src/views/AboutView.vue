@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import { NCard, NSpace, NText, NTag, NIcon, useMessage } from "naive-ui";
-import { LogoGithub, LinkOutline } from "@vicons/ionicons5";
+import { NCard, NSpace, NText, NTag, NIcon, NButton, useMessage } from "naive-ui";
+import { LogoGithub, LinkOutline, RefreshOutline } from "@vicons/ionicons5";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { getName, getVersion } from "@tauri-apps/api/app";
+import { useUpdater } from "../composables/useUpdater";
 
 const message = useMessage();
 
@@ -46,6 +47,19 @@ async function openLink(url: string) {
     message.error(e instanceof Error ? e.message : String(e));
   }
 }
+
+const { checkManually } = useUpdater();
+const checking = ref(false);
+
+async function onCheckUpdate() {
+  if (checking.value) return;
+  checking.value = true;
+  try {
+    await checkManually();
+  } finally {
+    checking.value = false;
+  }
+}
 </script>
 
 <template>
@@ -62,8 +76,19 @@ async function openLink(url: string) {
           </div>
           <div class="info-item">
             <n-text depth="3" class="info-label">版本</n-text>
-            <div class="info-value">
+            <div class="info-value version-row">
               <n-tag size="small" type="info" :bordered="false">{{ APP_VERSION }}</n-tag>
+              <n-button
+                size="tiny"
+                secondary
+                :loading="checking"
+                @click="onCheckUpdate"
+              >
+                <template #icon>
+                  <n-icon :component="RefreshOutline" />
+                </template>
+                检查更新
+              </n-button>
             </div>
           </div>
           <div class="info-item">
@@ -141,6 +166,12 @@ async function openLink(url: string) {
   font-size: 14px;
   font-weight: 600;
   word-break: break-all;
+}
+
+.version-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .links-block {
