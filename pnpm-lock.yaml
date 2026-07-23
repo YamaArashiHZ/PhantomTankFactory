@@ -26,6 +26,12 @@ importers:
       naive-ui:
         specifier: ^2.44.1
         version: 2.44.1(vue@3.5.40(typescript@5.6.3))
+      overlayscrollbars:
+        specifier: ^2.16.0
+        version: 2.16.0
+      overlayscrollbars-vue:
+        specifier: ^0.5.10
+        version: 0.5.10(overlayscrollbars@2.16.0)(vue@3.5.40(typescript@5.6.3))
       vue:
         specifier: ^3.5.13
         version: 3.5.40(typescript@5.6.3)
@@ -634,6 +640,15 @@ packages:
     engines: {node: ^10 || ^12 || ^13.7 || ^14 || >=15.0.1}
     hasBin: true
 
+  overlayscrollbars-vue@0.5.10:
+    resolution: {integrity: sha512-vu35CJj/kzGBgkxsQyXCCCRRBz/3AvXhkDckuiRHphRE6CwXjbWATY0PVbn2KRy30NbaZhHqueH5yqPo8ItqTA==}
+    peerDependencies:
+      overlayscrollbars: ^2.0.0
+      vue: ^3.2.25
+
+  overlayscrollbars@2.16.0:
+    resolution: {integrity: sha512-N03oje/q7j93D0aLZtoCdsDSYLmhheSsv8H7oSLE7HhdV9P/bmCURtLV/KbPye7P/bpfyt/obSfDpGUYoJ0OWg==}
+
   path-browserify@1.0.1:
     resolution: {integrity: sha512-b7uo2UCUOYZcnF/3ID0lulOJi/bafxa1xPe7ZPsammBSpjSWQkjNxlt635YGS2MiR9GjvuXCtz2emr3jbsz98g==}
 
@@ -1203,6 +1218,13 @@ snapshots:
       vueuc: 0.4.65(vue@3.5.40(typescript@5.6.3))
 
   nanoid@3.3.16: {}
+
+  overlayscrollbars-vue@0.5.10(overlayscrollbars@2.16.0)(vue@3.5.40(typescript@5.6.3)):
+    dependencies:
+      overlayscrollbars: 2.16.0
+      vue: 3.5.40(typescript@5.6.3)
+
+  overlayscrollbars@2.16.0: {}
 
   path-browserify@1.0.1: {}
 

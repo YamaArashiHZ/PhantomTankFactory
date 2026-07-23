@@ -18,6 +18,8 @@ export interface AppConfig {
   exportDirectory: string;
   theme: ThemeMode;
   previewQuality: PreviewQuality;
+  /** 是否启用实时效果预览 */
+  previewEnabled: boolean;
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
@@ -26,6 +28,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   exportDirectory: "",
   theme: "light",
   previewQuality: "medium",
+  previewEnabled: true,
 };
 
 export interface ProcessResult {

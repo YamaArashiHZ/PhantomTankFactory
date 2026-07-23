@@ -31,21 +31,6 @@ body {
   overflow: hidden;
 }
 
-.app-main {
-  flex: 1;
-  min-width: 0;
-  height: 100%;
-  overflow: auto;
-  padding: 20px 24px 24px;
-  box-sizing: border-box;
-}
-
-.app-main > * {
-  width: 100%;
-  max-width: none;
-  box-sizing: border-box;
-}
-
 .page-title {
   margin: 0 0 4px;
   font-size: 22px;

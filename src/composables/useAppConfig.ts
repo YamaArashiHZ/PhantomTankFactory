@@ -44,6 +44,9 @@ function clampConfig(raw: Partial<AppConfig> | null | undefined): AppConfig {
   if (q !== "low" && q !== "medium" && q !== "high" && q !== "original") {
     next.previewQuality = DEFAULT_CONFIG.previewQuality;
   }
+  if (typeof next.previewEnabled !== "boolean") {
+    next.previewEnabled = DEFAULT_CONFIG.previewEnabled;
+  }
   return next;
 }
 

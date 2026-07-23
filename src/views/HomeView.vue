@@ -1,20 +1,17 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount } from "vue";
+import { ref, computed, watch, onBeforeUnmount, h } from "vue";
 import {
   NButton,
   NCard,
   NSpace,
   NInput,
-  NText,
-  NAlert,
-  NSpin,
   NIcon,
   useMessage,
+  useNotification,
 } from "naive-ui";
 import {
   FolderOpenOutline,
   SparklesOutline,
-  CheckmarkCircleOutline,
   OpenOutline,
 } from "@vicons/ionicons5";
 import { invoke } from "@tauri-apps/api/core";
@@ -44,11 +41,13 @@ function clampAspect(width: number, height: number): number {
 }
 
 const message = useMessage();
+const notification = useNotification();
 const {
   brightnessEnhancement,
   brightnessReduction,
   exportDirectory,
   previewQuality,
+  previewEnabled,
 } = useAppConfig();
 
 const surfacePath = ref<string | null>(null);
@@ -56,7 +55,6 @@ const innerPath = ref<string | null>(null);
 const surfaceNatural = ref<NaturalSize | null>(null);
 const innerNatural = ref<NaturalSize | null>(null);
 const processing = ref(false);
-const lastOutput = ref<string | null>(null);
 
 const surfaceEffectUrl = ref<string | null>(null);
 const innerEffectUrl = ref<string | null>(null);
@@ -129,13 +127,38 @@ async function openExportDir() {
   }
 }
 
+function showExportDoneBanner(outputPath: string) {
+  const fileName = outputPath.replace(/\\/g, "/").split("/").pop() || outputPath;
+  notification.success({
+    title: "合成完成",
+    content: fileName,
+    meta: outputPath,
+    duration: 6500,
+    keepAliveOnHover: true,
+    action: () =>
+      h(
+        NButton,
+        {
+          size: "small",
+          secondary: true,
+          type: "primary",
+          onClick: () => {
+            void revealItemInDir(outputPath).catch((e) => {
+              message.error(String(e));
+            });
+          },
+        },
+        { default: () => "在文件夹中显示" },
+      ),
+  });
+}
+
 async function process() {
   if (!surfacePath.value || !innerPath.value) {
     message.warning("请先选择表图和里图");
     return;
   }
   processing.value = true;
-  lastOutput.value = null;
   try {
     const result = await invoke<ProcessResult>("process_phantom_tank", {
       surfacePath: surfacePath.value,
@@ -144,22 +167,16 @@ async function process() {
       brightnessReduction: brightnessReduction.value,
       exportDirectory: exportDirectory.value || "",
     });
-    lastOutput.value = result.outputPath;
-    message.success("合成完成");
+    showExportDoneBanner(result.outputPath);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
-    message.error(msg || "合成失败");
+    notification.error({
+      title: "合成失败",
+      content: msg || "未知错误",
+      duration: 5000,
+    });
   } finally {
     processing.value = false;
-  }
-}
-
-async function revealOutput() {
-  if (!lastOutput.value) return;
-  try {
-    await revealItemInDir(lastOutput.value);
-  } catch (e) {
-    message.error(String(e));
   }
 }
 
@@ -171,7 +188,7 @@ function clearPreview() {
 }
 
 async function runPreview() {
-  if (!surfacePath.value || !innerPath.value) {
+  if (!previewEnabled.value || !surfacePath.value || !innerPath.value) {
     clearPreview();
     return;
   }
@@ -207,7 +224,8 @@ async function runPreview() {
 
 function schedulePreview() {
   if (previewTimer) clearTimeout(previewTimer);
-  if (!surfacePath.value || !innerPath.value) {
+  if (!previewEnabled.value || !surfacePath.value || !innerPath.value) {
+    previewSeq += 1;
     clearPreview();
     return;
   }
@@ -220,8 +238,19 @@ function setPreviewQuality(q: PreviewQuality) {
   previewQuality.value = q;
 }
 
+function setPreviewEnabled(v: boolean) {
+  previewEnabled.value = v;
+}
+
 watch(
-  [surfacePath, innerPath, brightnessEnhancement, brightnessReduction, previewQuality],
+  [
+    surfacePath,
+    innerPath,
+    brightnessEnhancement,
+    brightnessReduction,
+    previewQuality,
+    previewEnabled,
+  ],
   () => schedulePreview(),
   { immediate: true },
 );
@@ -271,7 +300,9 @@ onBeforeUnmount(() => {
         :ready="previewReady"
         :error="previewError"
         :quality="previewQuality"
+        :enabled="previewEnabled"
         @update:quality="setPreviewQuality"
+        @update:enabled="setPreviewEnabled"
       />
 
       <n-card title="导出" size="small">
@@ -310,18 +341,6 @@ onBeforeUnmount(() => {
               生成幻影坦克
             </n-button>
           </n-space>
-
-          <n-spin v-if="processing" description="正在合成，请稍候…" />
-
-          <n-alert v-if="lastOutput" type="success" :bordered="false">
-            <template #icon>
-              <n-icon :component="CheckmarkCircleOutline" />
-            </template>
-            <div class="result-row">
-              <n-text class="result-path" :title="lastOutput">{{ lastOutput }}</n-text>
-              <n-button size="small" secondary @click="revealOutput">在文件夹中显示</n-button>
-            </div>
-          </n-alert>
         </n-space>
       </n-card>
     </n-space>
@@ -361,20 +380,6 @@ onBeforeUnmount(() => {
   display: flex;
   gap: 10px;
   width: 100%;
-}
-
-.result-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.result-path {
-  flex: 1;
-  min-width: 0;
-  word-break: break-all;
-  font-size: 12px;
 }
 
 @media (max-width: 720px) {

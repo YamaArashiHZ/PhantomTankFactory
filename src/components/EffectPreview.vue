@@ -7,6 +7,7 @@ import {
   NText,
   NSelect,
   NSpace,
+  NCheckbox,
 } from "naive-ui";
 import type { PreviewQuality } from "../types";
 
@@ -22,10 +23,12 @@ const props = defineProps<{
   ready: boolean;
   error: string | null;
   quality: PreviewQuality;
+  enabled: boolean;
 }>();
 
 const emit = defineEmits<{
   "update:quality": [value: PreviewQuality];
+  "update:enabled": [value: boolean];
 }>();
 
 const qualityOptions = [
@@ -70,15 +73,28 @@ function onImgLoad(e: Event) {
 </script>
 
 <template>
-  <n-card title="效果预览" size="small">
+  <n-card size="small" class="effect-card" :class="{ 'is-off': !enabled }">
+    <template #header>
+      <div class="title-row">
+        <span class="title-text">效果预览</span>
+        <n-checkbox
+          :checked="enabled"
+          @update:checked="(v) => emit('update:enabled', !!v)"
+        >
+          启用
+        </n-checkbox>
+      </div>
+    </template>
+
     <template #header-extra>
-      <n-space align="center" :size="10">
+      <n-space v-show="enabled" align="center" :size="10" class="header-extra">
         <n-text depth="3" style="font-size: 12px">清晰度</n-text>
         <n-select
           :value="quality"
           :options="qualityOptions"
           size="tiny"
           style="width: 88px"
+          :disabled="!enabled"
           @update:value="(v) => emit('update:quality', v as PreviewQuality)"
         />
         <n-text v-if="loading" depth="3" style="font-size: 12px">更新中…</n-text>
@@ -86,55 +102,101 @@ function onImgLoad(e: Event) {
       </n-space>
     </template>
 
-    <n-text depth="3" class="quality-tip">
-      提示：清晰度仅影响预览，不影响最终导出；档位过高时预览生成可能较慢。
-    </n-text>
+    <div class="body-collapse" :class="{ open: enabled }">
+      <div class="body-inner">
+        <n-text depth="3" class="quality-tip">
+          提示：清晰度仅影响预览，不影响最终导出；档位过高时预览生成可能较慢。
+        </n-text>
 
-    <n-spin :show="loading && ready">
-      <div v-if="!ready" class="empty-wrap">
-        <n-empty description="请先选择表图与里图" size="small" />
-      </div>
-      <div v-else-if="error" class="empty-wrap">
-        <n-empty :description="error" size="small" />
-      </div>
-      <div v-else class="preview-grid">
-        <div class="pane">
-          <div class="pane-label">表图效果（白底 / 缩略图）</div>
-          <div class="pane-box surface" :style="paneBoxStyle">
-            <img
-              v-if="surfacePreview"
-              :key="surfacePreview.slice(0, 64)"
-              :src="surfacePreview"
-              alt="表图效果"
-              class="pane-img"
-              draggable="false"
-              @load="onImgLoad"
-            />
+        <n-spin :show="loading && ready && enabled">
+          <div v-if="!ready" class="empty-wrap">
+            <n-empty description="请先选择表图与里图" size="small" />
           </div>
-        </div>
-        <div class="pane">
-          <div class="pane-label">里图效果（黑底 / 点开大图）</div>
-          <div class="pane-box inner" :style="paneBoxStyle">
-            <img
-              v-if="innerPreview"
-              :key="innerPreview.slice(0, 64)"
-              :src="innerPreview"
-              alt="里图效果"
-              class="pane-img"
-              draggable="false"
-            />
+          <div v-else-if="error" class="empty-wrap">
+            <n-empty :description="error" size="small" />
           </div>
-        </div>
+          <div v-else class="preview-grid">
+            <div class="pane">
+              <div class="pane-label">表图效果（白底 / 缩略图）</div>
+              <div class="pane-box surface" :style="paneBoxStyle">
+                <img
+                  v-if="surfacePreview"
+                  :key="surfacePreview.slice(0, 64)"
+                  :src="surfacePreview"
+                  alt="表图效果"
+                  class="pane-img"
+                  draggable="false"
+                  @load="onImgLoad"
+                />
+              </div>
+            </div>
+            <div class="pane">
+              <div class="pane-label">里图效果（黑底 / 点开大图）</div>
+              <div class="pane-box inner" :style="paneBoxStyle">
+                <img
+                  v-if="innerPreview"
+                  :key="innerPreview.slice(0, 64)"
+                  :src="innerPreview"
+                  alt="里图效果"
+                  class="pane-img"
+                  draggable="false"
+                />
+              </div>
+            </div>
+          </div>
+        </n-spin>
       </div>
-    </n-spin>
+    </div>
   </n-card>
 </template>
 
 <style scoped>
+.title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.title-text {
+  font-weight: 600;
+}
+
+.header-extra {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.effect-card.is-off .header-extra {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(6px);
+}
+
+/* 网格行高折叠：平滑展开/收起 */
+.body-collapse {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+    opacity 0.28s ease,
+    margin 0.35s ease;
+  margin-top: 0;
+}
+
+.body-collapse.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.body-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .quality-tip {
   display: block;
   font-size: 12px;
-  margin: -4px 0 12px;
+  margin: 0 0 12px;
   line-height: 1.5;
 }
 

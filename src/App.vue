@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, onBeforeUnmount, ref } from "vue";
 import {
   NConfigProvider,
   NMessageProvider,
+  NNotificationProvider,
   darkTheme,
   type GlobalThemeOverrides,
 } from "naive-ui";
+import { OverlayScrollbarsComponent } from "overlayscrollbars-vue";
+import type { OverlayScrollbars } from "overlayscrollbars";
+import "overlayscrollbars/overlayscrollbars.css";
 import AppSidebar from "./components/AppSidebar.vue";
 import HomeView from "./views/HomeView.vue";
 import AboutView from "./views/AboutView.vue";
@@ -15,6 +19,78 @@ import type { AppPage } from "./types";
 const page = ref<AppPage>("home");
 const { theme, toggleTheme } = useAppConfig();
 const ready = ref(false);
+
+/** 滚轮平滑滚动：缓动系数与清理句柄 */
+const SMOOTH_EASE = 0.18;
+let smoothViewport: HTMLElement | null = null;
+let smoothTarget = 0;
+let smoothRaf = 0;
+let smoothAttached = false;
+
+function clampScroll(el: HTMLElement, y: number) {
+  const max = Math.max(0, el.scrollHeight - el.clientHeight);
+  return Math.min(max, Math.max(0, y));
+}
+
+function smoothTick() {
+  const el = smoothViewport;
+  if (!el) {
+    smoothRaf = 0;
+    return;
+  }
+  const cur = el.scrollTop;
+  const diff = smoothTarget - cur;
+  if (Math.abs(diff) < 0.4) {
+    el.scrollTop = smoothTarget;
+    smoothRaf = 0;
+    return;
+  }
+  el.scrollTop = cur + diff * SMOOTH_EASE;
+  smoothRaf = requestAnimationFrame(smoothTick);
+}
+
+function onSmoothWheel(e: WheelEvent) {
+  const el = smoothViewport;
+  if (!el) return;
+  // 触控板惯性已较平滑时仍统一处理，避免双重滚动
+  e.preventDefault();
+  let delta = e.deltaY;
+  if (e.deltaMode === 1) delta *= 16; // lines
+  if (e.deltaMode === 2) delta *= el.clientHeight; // pages
+  if (!smoothRaf) smoothTarget = el.scrollTop;
+  smoothTarget = clampScroll(el, smoothTarget + delta);
+  if (!smoothRaf) smoothRaf = requestAnimationFrame(smoothTick);
+}
+
+function onSmoothNativeScroll() {
+  // 拖动滑块时同步目标，避免回弹
+  if (!smoothRaf && smoothViewport) {
+    smoothTarget = smoothViewport.scrollTop;
+  }
+}
+
+function attachSmoothScroll(os: OverlayScrollbars) {
+  detachSmoothScroll();
+  const el = os.elements().viewport;
+  smoothViewport = el;
+  smoothTarget = el.scrollTop;
+  el.addEventListener("wheel", onSmoothWheel, { passive: false });
+  el.addEventListener("scroll", onSmoothNativeScroll, { passive: true });
+  smoothAttached = true;
+}
+
+function detachSmoothScroll() {
+  if (smoothRaf) {
+    cancelAnimationFrame(smoothRaf);
+    smoothRaf = 0;
+  }
+  if (smoothViewport && smoothAttached) {
+    smoothViewport.removeEventListener("wheel", onSmoothWheel);
+    smoothViewport.removeEventListener("scroll", onSmoothNativeScroll);
+  }
+  smoothViewport = null;
+  smoothAttached = false;
+}
 
 const naiveTheme = computed(() => (theme.value === "dark" ? darkTheme : null));
 
@@ -53,27 +129,148 @@ const shellStyle = computed(() => {
   } as Record<string, string>;
 });
 
+/** OverlayScrollbars：无箭头、极简细条 */
+const osOptions = {
+  overflow: {
+    x: "hidden" as const,
+    y: "scroll" as const,
+  },
+  scrollbars: {
+    theme: "os-theme-minimal",
+    visibility: "auto" as const,
+    autoHide: "leave" as const,
+    autoHideDelay: 600,
+    dragScroll: true,
+    clickScroll: true,
+    pointers: ["mouse", "touch", "pen"] as ("mouse" | "touch" | "pen")[],
+  },
+};
+
+const osEvents = {
+  initialized: (os: OverlayScrollbars) => {
+    attachSmoothScroll(os);
+  },
+  destroyed: () => {
+    detachSmoothScroll();
+  },
+};
+
 onMounted(async () => {
   await loadAppConfig();
   ready.value = true;
+});
+
+onBeforeUnmount(() => {
+  detachSmoothScroll();
 });
 </script>
 
 <template>
   <n-config-provider :theme="naiveTheme" :theme-overrides="themeOverrides" style="height: 100%">
-    <n-message-provider>
-      <div v-if="ready" class="app-shell" :style="shellStyle">
-        <AppSidebar
-          :current="page"
-          :theme="theme"
-          @navigate="(p) => (page = p)"
-          @toggle-theme="toggleTheme"
-        />
-        <main class="app-main">
-          <HomeView v-if="page === 'home'" />
-          <AboutView v-else />
-        </main>
-      </div>
-    </n-message-provider>
+    <n-notification-provider placement="bottom" :max="3" container-class="app-notify-bottom">
+      <n-message-provider>
+        <div
+          v-if="ready"
+          class="app-shell"
+          :class="theme === 'dark' ? 'theme-dark' : 'theme-light'"
+          :style="shellStyle"
+        >
+          <AppSidebar
+            :current="page"
+            :theme="theme"
+            @navigate="(p) => (page = p)"
+            @toggle-theme="toggleTheme"
+          />
+          <OverlayScrollbarsComponent
+            class="app-main"
+            defer
+            :options="osOptions"
+            :events="osEvents"
+          >
+            <div class="app-main-inner">
+              <HomeView v-if="page === 'home'" />
+              <AboutView v-else />
+            </div>
+          </OverlayScrollbarsComponent>
+        </div>
+      </n-message-provider>
+    </n-notification-provider>
   </n-config-provider>
 </template>
+
+<style>
+/* 底部横幅式通知，类似手机通知条 */
+.app-notify-bottom,
+.n-notification-container--bottom {
+  left: 50% !important;
+  right: auto !important;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  bottom: 20px !important;
+  align-items: stretch !important;
+}
+
+.app-notify-bottom .n-notification,
+.n-notification-container--bottom .n-notification {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: 0 8px 28px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* —— OverlayScrollbars 极简主题 —— */
+.app-main.os-host,
+.app-main {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+
+.app-main-inner {
+  padding: 20px 24px 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-main-inner > * {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+/* 极简滚动条：固定 10px */
+.os-theme-minimal {
+  --os-size: 10px;
+  --os-padding-perpendicular: 3px;
+  --os-padding-axis: 6px;
+  --os-track-border-radius: 999px;
+  --os-handle-border-radius: 999px;
+  --os-handle-bg: rgba(71, 85, 105, 0.42);
+  --os-handle-bg-hover: rgba(71, 85, 105, 0.62);
+  --os-handle-bg-active: rgba(51, 65, 85, 0.78);
+  --os-handle-border: 0;
+  --os-handle-border-hover: none;
+  --os-handle-border-active: none;
+  --os-handle-min-size: 32px;
+}
+
+/* 深色模式：更亮、对比更强 */
+.theme-dark .os-theme-minimal {
+  --os-handle-bg: rgba(226, 232, 240, 0.38);
+  --os-handle-bg-hover: rgba(241, 245, 249, 0.55);
+  --os-handle-bg-active: rgba(248, 250, 252, 0.72);
+}
+
+.os-theme-minimal .os-scrollbar-track {
+  background: transparent !important;
+}
+
+.os-theme-minimal .os-scrollbar-handle {
+  transition:
+    background 0.2s ease,
+    opacity 0.2s ease;
+}
+</style>
