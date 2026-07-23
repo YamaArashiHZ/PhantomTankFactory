@@ -126,6 +126,35 @@ pub fn compose_phantom_tank(
     ops::apply_red_as_alpha(&dodged, &divided)
 }
 
+/// 加载两图并合成幻影坦克 RGBA。
+/// `max_edge`：`Some(edge)` 时先按最长边缩小（预览加速），`None` 使用原图。
+fn compose_from_paths(
+    surface_path: &Path,
+    inner_path: &Path,
+    brightness_enhancement: f64,
+    brightness_reduction: f64,
+    max_edge: Option<u32>,
+) -> Result<RgbaImage, ProcessError> {
+    let surface_full = load_rgba(surface_path)?;
+    let inner_full = load_rgba(inner_path)?;
+    let (surface, inner) = match max_edge {
+        Some(edge) => {
+            let edge = edge.clamp(64, 8192);
+            (
+                downscale_max_edge(&surface_full, edge),
+                downscale_max_edge(&inner_full, edge),
+            )
+        }
+        None => (surface_full, inner_full),
+    };
+    Ok(compose_phantom_tank(
+        &surface,
+        &inner,
+        brightness_enhancement,
+        brightness_reduction,
+    ))
+}
+
 /// 完整流水线，返回输出 PNG 路径。
 pub fn process_phantom_tank(
     surface_path: &Path,
@@ -134,14 +163,13 @@ pub fn process_phantom_tank(
     brightness_reduction: f64,
     output_dir: &Path,
 ) -> Result<PathBuf, ProcessError> {
-    let surface = load_rgba(surface_path)?;
-    let inner = load_rgba(inner_path)?;
-    let result = compose_phantom_tank(
-        &surface,
-        &inner,
+    let result = compose_from_paths(
+        surface_path,
+        inner_path,
         brightness_enhancement,
         brightness_reduction,
-    );
+        None,
+    )?;
 
     std::fs::create_dir_all(output_dir)
         .map_err(|e| ProcessError::CreateDir(format!("{} ({e})", output_dir.display())))?;
@@ -181,23 +209,13 @@ pub fn preview_phantom_tank(
     brightness_reduction: f64,
     max_edge: u32,
 ) -> Result<(String, String), ProcessError> {
-    let surface_full = load_rgba(surface_path)?;
-    let inner_full = load_rgba(inner_path)?;
-    let (surface, inner) = if max_edge == 0 {
-        (surface_full, inner_full)
-    } else {
-        let edge = max_edge.clamp(64, 8192);
-        (
-            downscale_max_edge(&surface_full, edge),
-            downscale_max_edge(&inner_full, edge),
-        )
-    };
-    let result = compose_phantom_tank(
-        &surface,
-        &inner,
+    let result = compose_from_paths(
+        surface_path,
+        inner_path,
         brightness_enhancement,
         brightness_reduction,
-    );
+        if max_edge == 0 { None } else { Some(max_edge) },
+    )?;
 
     let surface_fx = alpha_on_solid(&result, 255, 255, 255);
     let inner_fx = alpha_on_solid(&result, 0, 0, 0);

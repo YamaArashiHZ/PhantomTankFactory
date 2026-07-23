@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onBeforeUnmount, h } from "vue";
+import { ref, computed, watch } from "vue";
 import {
   NButton,
   NCard,
@@ -7,7 +7,6 @@ import {
   NInput,
   NIcon,
   useMessage,
-  useNotification,
 } from "naive-ui";
 import {
   FolderOpenOutline,
@@ -16,17 +15,14 @@ import {
 } from "@vicons/ionicons5";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openPath } from "@tauri-apps/plugin-opener";
 import ImagePickerCard from "../components/ImagePickerCard.vue";
 import BrightnessPanel from "../components/BrightnessPanel.vue";
 import EffectPreview from "../components/EffectPreview.vue";
 import { useAppConfig } from "../composables/useAppConfig";
-import {
-  PREVIEW_QUALITY_EDGE,
-  type PreviewQuality,
-  type PreviewResult,
-  type ProcessResult,
-} from "../types";
+import { useEffectPreview } from "../composables/useEffectPreview";
+import { useExport } from "../composables/useExport";
+import type { PreviewQuality } from "../types";
 
 /** 横/竖比例上限 16:9 → 宽高比夹在 9:16 ~ 16:9 */
 const ASPECT_MAX = 16 / 9;
@@ -41,7 +37,6 @@ function clampAspect(width: number, height: number): number {
 }
 
 const message = useMessage();
-const notification = useNotification();
 const {
   brightnessEnhancement,
   brightnessReduction,
@@ -54,16 +49,6 @@ const surfacePath = ref<string | null>(null);
 const innerPath = ref<string | null>(null);
 const surfaceNatural = ref<NaturalSize | null>(null);
 const innerNatural = ref<NaturalSize | null>(null);
-const processing = ref(false);
-
-const surfaceEffectUrl = ref<string | null>(null);
-const innerEffectUrl = ref<string | null>(null);
-const previewLoading = ref(false);
-const previewError = ref<string | null>(null);
-let previewTimer: ReturnType<typeof setTimeout> | null = null;
-let previewSeq = 0;
-
-const previewReady = computed(() => !!surfacePath.value && !!innerPath.value);
 
 /**
  * 两卡同步比例：各自 clamp 后取「更高」的一方（aspect 更小），
@@ -96,9 +81,15 @@ function onInnerNatural(s: NaturalSize | null) {
   innerNatural.value = s;
 }
 
-const canProcess = computed(
-  () => !!surfacePath.value && !!innerPath.value && !processing.value,
-);
+const {
+  surfaceEffectUrl,
+  innerEffectUrl,
+  previewLoading,
+  previewError,
+  previewReady,
+} = useEffectPreview(surfacePath, innerPath);
+
+const { processing, canProcess, process } = useExport(surfacePath, innerPath);
 
 function setEnhancement(v: number) {
   brightnessEnhancement.value = v;
@@ -106,6 +97,14 @@ function setEnhancement(v: number) {
 
 function setReduction(v: number) {
   brightnessReduction.value = v;
+}
+
+function setPreviewQuality(q: PreviewQuality) {
+  previewQuality.value = q;
+}
+
+function setPreviewEnabled(v: boolean) {
+  previewEnabled.value = v;
 }
 
 async function pickExportDir() {
@@ -126,139 +125,6 @@ async function openExportDir() {
     message.error(e instanceof Error ? e.message : String(e));
   }
 }
-
-function showExportDoneBanner(outputPath: string) {
-  const fileName = outputPath.replace(/\\/g, "/").split("/").pop() || outputPath;
-  notification.success({
-    title: "合成完成",
-    content: fileName,
-    meta: outputPath,
-    duration: 6500,
-    keepAliveOnHover: true,
-    action: () =>
-      h(
-        NButton,
-        {
-          size: "small",
-          secondary: true,
-          type: "primary",
-          onClick: () => {
-            void revealItemInDir(outputPath).catch((e) => {
-              message.error(String(e));
-            });
-          },
-        },
-        { default: () => "在文件夹中显示" },
-      ),
-  });
-}
-
-async function process() {
-  if (!surfacePath.value || !innerPath.value) {
-    message.warning("请先选择表图和里图");
-    return;
-  }
-  processing.value = true;
-  try {
-    const result = await invoke<ProcessResult>("process_phantom_tank", {
-      surfacePath: surfacePath.value,
-      innerPath: innerPath.value,
-      brightnessEnhancement: brightnessEnhancement.value,
-      brightnessReduction: brightnessReduction.value,
-      exportDirectory: exportDirectory.value || "",
-    });
-    showExportDoneBanner(result.outputPath);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    notification.error({
-      title: "合成失败",
-      content: msg || "未知错误",
-      duration: 5000,
-    });
-  } finally {
-    processing.value = false;
-  }
-}
-
-function clearPreview() {
-  surfaceEffectUrl.value = null;
-  innerEffectUrl.value = null;
-  previewError.value = null;
-  previewLoading.value = false;
-}
-
-async function runPreview() {
-  if (!previewEnabled.value || !surfacePath.value || !innerPath.value) {
-    clearPreview();
-    return;
-  }
-
-  const seq = ++previewSeq;
-  previewLoading.value = true;
-  previewError.value = null;
-
-  try {
-    const edge =
-      PREVIEW_QUALITY_EDGE[previewQuality.value] ?? PREVIEW_QUALITY_EDGE.medium;
-    const result = await invoke<PreviewResult>("preview_phantom_tank", {
-      surfacePath: surfacePath.value,
-      innerPath: innerPath.value,
-      brightnessEnhancement: brightnessEnhancement.value,
-      brightnessReduction: brightnessReduction.value,
-      maxEdge: edge,
-    });
-    if (seq !== previewSeq) return;
-    surfaceEffectUrl.value = result.surfacePreview;
-    innerEffectUrl.value = result.innerPreview;
-  } catch (e) {
-    if (seq !== previewSeq) return;
-    previewError.value = e instanceof Error ? e.message : String(e);
-    surfaceEffectUrl.value = null;
-    innerEffectUrl.value = null;
-  } finally {
-    if (seq === previewSeq) {
-      previewLoading.value = false;
-    }
-  }
-}
-
-function schedulePreview() {
-  if (previewTimer) clearTimeout(previewTimer);
-  if (!previewEnabled.value || !surfacePath.value || !innerPath.value) {
-    previewSeq += 1;
-    clearPreview();
-    return;
-  }
-  previewTimer = setTimeout(() => {
-    void runPreview();
-  }, 280);
-}
-
-function setPreviewQuality(q: PreviewQuality) {
-  previewQuality.value = q;
-}
-
-function setPreviewEnabled(v: boolean) {
-  previewEnabled.value = v;
-}
-
-watch(
-  [
-    surfacePath,
-    innerPath,
-    brightnessEnhancement,
-    brightnessReduction,
-    previewQuality,
-    previewEnabled,
-  ],
-  () => schedulePreview(),
-  { immediate: true },
-);
-
-onBeforeUnmount(() => {
-  if (previewTimer) clearTimeout(previewTimer);
-  previewSeq += 1;
-});
 </script>
 
 <template>

@@ -1,13 +1,26 @@
 <script setup lang="ts">
+import { onMounted, ref } from "vue";
 import { NCard, NSpace, NText, NTag, NIcon, useMessage } from "naive-ui";
 import { LogoGithub, LinkOutline } from "@vicons/ionicons5";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { getName, getVersion } from "@tauri-apps/api/app";
 
 const message = useMessage();
 
-const APP_NAME = "PhantomTank Factory";
-const APP_VERSION = "0.1.0";
+/** 名称/版本从 tauri.conf.json 运行时读取，发版只需改一处 */
+const APP_NAME = ref("PhantomTank Factory");
+const APP_VERSION = ref("0.1.0");
 const APP_AUTHOR = "YamaArashi";
+
+onMounted(async () => {
+  try {
+    const [name, version] = await Promise.all([getName(), getVersion()]);
+    if (name) APP_NAME.value = name;
+    if (version) APP_VERSION.value = version;
+  } catch {
+    /* 读取失败时保留默认值 */
+  }
+});
 
 const links = [
   {
