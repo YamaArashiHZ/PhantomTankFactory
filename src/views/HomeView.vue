@@ -11,10 +11,15 @@ import {
   NIcon,
   useMessage,
 } from "naive-ui";
-import { FolderOpenOutline, SparklesOutline, CheckmarkCircleOutline } from "@vicons/ionicons5";
+import {
+  FolderOpenOutline,
+  SparklesOutline,
+  CheckmarkCircleOutline,
+  OpenOutline,
+} from "@vicons/ionicons5";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import ImagePickerCard from "../components/ImagePickerCard.vue";
 import BrightnessPanel from "../components/BrightnessPanel.vue";
 import { useAppConfig } from "../composables/useAppConfig";
@@ -89,6 +94,18 @@ async function pickExportDir() {
   const dir = await open({ directory: true, multiple: false });
   if (typeof dir === "string") {
     exportDirectory.value = dir;
+  }
+}
+
+async function openExportDir() {
+  try {
+    let dir = exportDirectory.value?.trim() || "";
+    if (!dir) {
+      dir = await invoke<string>("get_temp_dir");
+    }
+    await openPath(dir);
+  } catch (e) {
+    message.error(e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -173,6 +190,12 @@ async function revealOutput() {
               </template>
               浏览
             </n-button>
+            <n-button secondary @click="openExportDir">
+              <template #icon>
+                <n-icon :component="OpenOutline" />
+              </template>
+              打开目录
+            </n-button>
           </div>
 
           <n-space>
@@ -209,7 +232,17 @@ async function revealOutput() {
 
 <style scoped>
 .home {
-  max-width: 980px;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.home :deep(.n-space) {
+  width: 100%;
+}
+
+.home :deep(.n-card) {
+  width: 100%;
 }
 
 .pickers {

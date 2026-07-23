@@ -37,6 +37,13 @@ body {
   height: 100%;
   overflow: auto;
   padding: 20px 24px 24px;
+  box-sizing: border-box;
+}
+
+.app-main > * {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .page-title {

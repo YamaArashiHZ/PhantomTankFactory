@@ -7,7 +7,7 @@ import { NCard, NSpace, NText, NTag } from "naive-ui";
     <h1 class="page-title">关于</h1>
     <p class="page-subtitle">PhantomTank Factory · 幻影坦克合成工具</p>
 
-    <n-space vertical :size="16" style="max-width: 720px">
+    <n-space vertical :size="16" style="width: 100%">
       <n-card size="small" title="应用信息">
         <n-space vertical :size="8">
           <div class="row">
@@ -38,6 +38,12 @@ import { NCard, NSpace, NText, NTag } from "naive-ui";
 </template>
 
 <style scoped>
+.about {
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
+}
+
 .row {
   display: flex;
   justify-content: space-between;

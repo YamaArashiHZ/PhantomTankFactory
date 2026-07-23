@@ -32,14 +32,12 @@ const resolvedAspect = computed(() =>
   props.boxAspect && props.boxAspect > 0 ? props.boxAspect : DEFAULT_ASPECT,
 );
 
-const previewBoxStyle = computed(() => {
-  const a = resolvedAspect.value;
-  return {
-    aspectRatio: String(a),
-    width: `min(100%, calc(min(72vh, 520px) * ${a}))`,
-    maxHeight: "min(72vh, 520px)",
-  };
-});
+const previewBoxStyle = computed(() => ({
+  // 始终铺满卡片宽度，高度由统一比例决定；图片 contain 尽量填满框
+  width: "100%",
+  aspectRatio: String(resolvedAspect.value),
+  maxHeight: "78vh",
+}));
 
 watch(
   () => props.path,
@@ -163,10 +161,10 @@ function clear() {
 
 .preview-box {
   position: relative;
-  margin-inline: auto;
+  margin: 0;
   min-height: 160px;
   height: auto;
-  padding: 10px;
+  padding: 8px;
   border-radius: 12px;
   border: 1px dashed var(--border-color);
   background: var(--preview-bg);
@@ -175,16 +173,8 @@ function clear() {
   justify-content: center;
   overflow: hidden;
   cursor: pointer;
-  transition:
-    border-color 0.2s,
-    background 0.2s,
-    width 0.2s ease,
-    aspect-ratio 0.2s ease;
+  transition: border-color 0.2s, background 0.2s, aspect-ratio 0.2s ease;
   box-sizing: border-box;
-}
-
-.preview-box.empty {
-  /* 空状态也跟统一比例，保证两卡同高 */
 }
 
 .preview-box:hover {
@@ -193,10 +183,10 @@ function clear() {
 
 .preview-img {
   display: block;
+  width: 100%;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
-  width: auto;
-  height: auto;
   object-fit: contain;
   object-position: center;
   pointer-events: none;
