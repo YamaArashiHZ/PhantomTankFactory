@@ -40,6 +40,10 @@ function clampConfig(raw: Partial<AppConfig> | null | undefined): AppConfig {
   if (typeof next.exportDirectory !== "string") {
     next.exportDirectory = "";
   }
+  const q = next.previewQuality as string;
+  if (q !== "low" && q !== "medium" && q !== "high" && q !== "original") {
+    next.previewQuality = DEFAULT_CONFIG.previewQuality;
+  }
   return next;
 }
 

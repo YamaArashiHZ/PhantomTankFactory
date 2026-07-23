@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, onBeforeUnmount } from "vue";
 import {
   NButton,
   NCard,
@@ -22,8 +22,14 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import ImagePickerCard from "../components/ImagePickerCard.vue";
 import BrightnessPanel from "../components/BrightnessPanel.vue";
+import EffectPreview from "../components/EffectPreview.vue";
 import { useAppConfig } from "../composables/useAppConfig";
-import type { ProcessResult } from "../types";
+import {
+  PREVIEW_QUALITY_EDGE,
+  type PreviewQuality,
+  type PreviewResult,
+  type ProcessResult,
+} from "../types";
 
 /** 横/竖比例上限 16:9 → 宽高比夹在 9:16 ~ 16:9 */
 const ASPECT_MAX = 16 / 9;
@@ -38,7 +44,12 @@ function clampAspect(width: number, height: number): number {
 }
 
 const message = useMessage();
-const { brightnessEnhancement, brightnessReduction, exportDirectory } = useAppConfig();
+const {
+  brightnessEnhancement,
+  brightnessReduction,
+  exportDirectory,
+  previewQuality,
+} = useAppConfig();
 
 const surfacePath = ref<string | null>(null);
 const innerPath = ref<string | null>(null);
@@ -46,6 +57,15 @@ const surfaceNatural = ref<NaturalSize | null>(null);
 const innerNatural = ref<NaturalSize | null>(null);
 const processing = ref(false);
 const lastOutput = ref<string | null>(null);
+
+const surfaceEffectUrl = ref<string | null>(null);
+const innerEffectUrl = ref<string | null>(null);
+const previewLoading = ref(false);
+const previewError = ref<string | null>(null);
+let previewTimer: ReturnType<typeof setTimeout> | null = null;
+let previewSeq = 0;
+
+const previewReady = computed(() => !!surfacePath.value && !!innerPath.value);
 
 /**
  * 两卡同步比例：各自 clamp 后取「更高」的一方（aspect 更小），
@@ -142,6 +162,74 @@ async function revealOutput() {
     message.error(String(e));
   }
 }
+
+function clearPreview() {
+  surfaceEffectUrl.value = null;
+  innerEffectUrl.value = null;
+  previewError.value = null;
+  previewLoading.value = false;
+}
+
+async function runPreview() {
+  if (!surfacePath.value || !innerPath.value) {
+    clearPreview();
+    return;
+  }
+
+  const seq = ++previewSeq;
+  previewLoading.value = true;
+  previewError.value = null;
+
+  try {
+    const edge =
+      PREVIEW_QUALITY_EDGE[previewQuality.value] ?? PREVIEW_QUALITY_EDGE.medium;
+    const result = await invoke<PreviewResult>("preview_phantom_tank", {
+      surfacePath: surfacePath.value,
+      innerPath: innerPath.value,
+      brightnessEnhancement: brightnessEnhancement.value,
+      brightnessReduction: brightnessReduction.value,
+      maxEdge: edge,
+    });
+    if (seq !== previewSeq) return;
+    surfaceEffectUrl.value = result.surfacePreview;
+    innerEffectUrl.value = result.innerPreview;
+  } catch (e) {
+    if (seq !== previewSeq) return;
+    previewError.value = e instanceof Error ? e.message : String(e);
+    surfaceEffectUrl.value = null;
+    innerEffectUrl.value = null;
+  } finally {
+    if (seq === previewSeq) {
+      previewLoading.value = false;
+    }
+  }
+}
+
+function schedulePreview() {
+  if (previewTimer) clearTimeout(previewTimer);
+  if (!surfacePath.value || !innerPath.value) {
+    clearPreview();
+    return;
+  }
+  previewTimer = setTimeout(() => {
+    void runPreview();
+  }, 280);
+}
+
+function setPreviewQuality(q: PreviewQuality) {
+  previewQuality.value = q;
+}
+
+watch(
+  [surfacePath, innerPath, brightnessEnhancement, brightnessReduction, previewQuality],
+  () => schedulePreview(),
+  { immediate: true },
+);
+
+onBeforeUnmount(() => {
+  if (previewTimer) clearTimeout(previewTimer);
+  previewSeq += 1;
+});
 </script>
 
 <template>
@@ -174,6 +262,16 @@ async function revealOutput() {
         :reduction="brightnessReduction"
         @update:enhancement="setEnhancement"
         @update:reduction="setReduction"
+      />
+
+      <EffectPreview
+        :surface-preview="surfaceEffectUrl"
+        :inner-preview="innerEffectUrl"
+        :loading="previewLoading"
+        :ready="previewReady"
+        :error="previewError"
+        :quality="previewQuality"
+        @update:quality="setPreviewQuality"
       />
 
       <n-card title="导出" size="small">

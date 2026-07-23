@@ -9,6 +9,7 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             commands::process::process_phantom_tank,
+            commands::process::preview_phantom_tank,
             commands::paths::get_temp_dir,
             commands::paths::get_default_export_dir,
         ])
