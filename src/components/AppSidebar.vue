@@ -16,7 +16,7 @@ const emit = defineEmits<{
 
 <template>
   <aside class="sidebar">
-    <div class="brand" title="PhantomTank Factory">PT</div>
+    <div class="brand" title="PhantomTank Factory">PTF</div>
 
     <nav class="nav-top">
       <n-tooltip placement="right" :delay="400">
@@ -90,9 +90,9 @@ const emit = defineEmits<{
   border-radius: 12px;
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;
   color: #fff;
   background: linear-gradient(135deg, #4f7cff 0%, #7b5cff 100%);
   margin-bottom: 10px;
