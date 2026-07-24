@@ -15,6 +15,8 @@ export const PREVIEW_QUALITY_EDGE: Record<PreviewQuality, number> = {
 export interface AppConfig {
   brightnessEnhancement: number;
   brightnessReduction: number;
+  contrast: number;
+  saturation: number;
   exportDirectory: string;
   theme: ThemeMode;
   previewQuality: PreviewQuality;
@@ -25,6 +27,8 @@ export interface AppConfig {
 export const DEFAULT_CONFIG: AppConfig = {
   brightnessEnhancement: 50,
   brightnessReduction: -50,
+  contrast: 0,
+  saturation: 0,
   exportDirectory: "",
   theme: "light",
   previewQuality: "medium",

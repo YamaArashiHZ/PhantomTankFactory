@@ -80,7 +80,25 @@ describe("clampConfig", () => {
     expect(result.theme).toBe("dark");
     expect(result.brightnessEnhancement).toBe(DEFAULT_CONFIG.brightnessEnhancement);
     expect(result.brightnessReduction).toBe(DEFAULT_CONFIG.brightnessReduction);
+    expect(result.contrast).toBe(DEFAULT_CONFIG.contrast);
+    expect(result.saturation).toBe(DEFAULT_CONFIG.saturation);
     expect(result.previewQuality).toBe(DEFAULT_CONFIG.previewQuality);
     expect(result.previewEnabled).toBe(DEFAULT_CONFIG.previewEnabled);
+  });
+
+  it("clamps contrast outside range", () => {
+    const result = clampConfig({ contrast: 150 });
+    expect(result.contrast).toBe(DEFAULT_CONFIG.contrast);
+  });
+
+  it("clamps saturation outside range", () => {
+    const result = clampConfig({ saturation: -200 });
+    expect(result.saturation).toBe(DEFAULT_CONFIG.saturation);
+  });
+
+  it("keeps valid contrast and saturation", () => {
+    const result = clampConfig({ contrast: 50, saturation: -30 });
+    expect(result.contrast).toBe(50);
+    expect(result.saturation).toBe(-30);
   });
 });

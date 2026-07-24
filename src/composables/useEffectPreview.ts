@@ -17,6 +17,8 @@ export function useEffectPreview(
   const {
     brightnessEnhancement,
     brightnessReduction,
+    contrast,
+    saturation,
     previewQuality,
     previewEnabled,
   } = useAppConfig();
@@ -59,6 +61,8 @@ export function useEffectPreview(
         innerPath: innerPath.value,
         brightnessEnhancement: brightnessEnhancement.value,
         brightnessReduction: brightnessReduction.value,
+        contrast: contrast.value,
+        saturation: saturation.value,
         maxEdge: edge,
       });
       if (seq !== previewSeq) return;
@@ -94,6 +98,8 @@ export function useEffectPreview(
       innerPath,
       brightnessEnhancement,
       brightnessReduction,
+      contrast,
+      saturation,
       previewQuality,
       previewEnabled,
     ],

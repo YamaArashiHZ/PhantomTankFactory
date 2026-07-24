@@ -37,6 +37,20 @@ export function clampConfig(raw: Partial<AppConfig> | null | undefined): AppConf
   if (next.theme !== "light" && next.theme !== "dark") {
     next.theme = DEFAULT_CONFIG.theme;
   }
+  if (
+    typeof next.contrast !== "number" ||
+    next.contrast < -100 ||
+    next.contrast > 100
+  ) {
+    next.contrast = DEFAULT_CONFIG.contrast;
+  }
+  if (
+    typeof next.saturation !== "number" ||
+    next.saturation < -100 ||
+    next.saturation > 100
+  ) {
+    next.saturation = DEFAULT_CONFIG.saturation;
+  }
   if (typeof next.exportDirectory !== "string") {
     next.exportDirectory = "";
   }

@@ -21,12 +21,18 @@ pub struct PreviewResult {
     pub inner_preview: String,
 }
 
-fn validate_params(enhancement: f64, reduction: f64) -> Result<(), String> {
+fn validate_params(enhancement: f64, reduction: f64, contrast: f64, saturation: f64) -> Result<(), String> {
     if !(0.0..=100.0).contains(&enhancement) {
         return Err("表图亮度增强须在 0~100".into());
     }
     if !(-100.0..=0.0).contains(&reduction) {
         return Err("里图亮度削减须在 -100~0".into());
+    }
+    if !(-100.0..=100.0).contains(&contrast) {
+        return Err("对比度须在 -100~100".into());
+    }
+    if !(-100.0..=100.0).contains(&saturation) {
+        return Err("饱和度须在 -100~100".into());
     }
     Ok(())
 }
@@ -38,9 +44,11 @@ pub async fn process_phantom_tank<R: Runtime>(
     inner_path: String,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
     export_directory: String,
 ) -> Result<ProcessResult, String> {
-    validate_params(brightness_enhancement, brightness_reduction)?;
+    validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
 
     let surface = PathBuf::from(&surface_path);
     let inner = PathBuf::from(&inner_path);
@@ -59,9 +67,11 @@ pub async fn process_phantom_tank<R: Runtime>(
 
     let enhancement = brightness_enhancement;
     let reduction = brightness_reduction;
+    let ct = contrast;
+    let sat = saturation;
 
     let path = tauri::async_runtime::spawn_blocking(move || {
-        phantom::process_phantom_tank(&surface, &inner, enhancement, reduction, &output_dir)
+        phantom::process_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, &output_dir)
             .map_err(|e| e.to_string())
     })
     .await
@@ -78,9 +88,11 @@ pub async fn preview_phantom_tank(
     inner_path: String,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
     max_edge: u32,
 ) -> Result<PreviewResult, String> {
-    validate_params(brightness_enhancement, brightness_reduction)?;
+    validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
 
     let surface = PathBuf::from(&surface_path);
     let inner = PathBuf::from(&inner_path);
@@ -93,9 +105,11 @@ pub async fn preview_phantom_tank(
 
     let enhancement = brightness_enhancement;
     let reduction = brightness_reduction;
+    let ct = contrast;
+    let sat = saturation;
 
     let (surface_preview, inner_preview) = tauri::async_runtime::spawn_blocking(move || {
-        phantom::preview_phantom_tank(&surface, &inner, enhancement, reduction, max_edge)
+        phantom::preview_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, max_edge)
             .map_err(|e| e.to_string())
     })
     .await

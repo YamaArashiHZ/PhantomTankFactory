@@ -70,6 +70,36 @@ pub fn adjust_brightness(image: &RgbaImage, lightness: f64) -> RgbaImage {
     out
 }
 
+pub fn adjust_contrast(image: &RgbaImage, contrast: f64) -> RgbaImage {
+    let (w, h) = image.dimensions();
+    let mut out = RgbaImage::new(w, h);
+    let factor = 1.0 + contrast / 100.0;
+    for (x, y, px) in image.enumerate_pixels() {
+        let f = |c: u8| -> u8 {
+            let v = (f64::from(c) - 128.0) * factor + 128.0;
+            v.round().clamp(0.0, 255.0) as u8
+        };
+        out.put_pixel(x, y, Rgba([f(px[0]), f(px[1]), f(px[2]), px[3]]));
+    }
+    out
+}
+
+pub fn adjust_saturation(image: &RgbaImage, saturation: f64) -> RgbaImage {
+    let (w, h) = image.dimensions();
+    let mut out = RgbaImage::new(w, h);
+    let factor = 1.0 + saturation / 100.0;
+    for (x, y, px) in image.enumerate_pixels() {
+        let gray = (u32::from(px[0]) * 299 + u32::from(px[1]) * 587 + u32::from(px[2]) * 114)
+            / 1000;
+        let s = |c: u8| -> u8 {
+            let v = f64::from(gray) + (f64::from(c) - f64::from(gray)) * factor;
+            v.round().clamp(0.0, 255.0) as u8
+        };
+        out.put_pixel(x, y, Rgba([s(px[0]), s(px[1]), s(px[2]), px[3]]));
+    }
+    out
+}
+
 pub fn invert_keep_alpha(image: &RgbaImage) -> RgbaImage {
     let (w, h) = image.dimensions();
     let mut out = RgbaImage::new(w, h);
@@ -260,6 +290,79 @@ mod tests {
         let out = adjust_brightness(&img, -100.0);
         let p = out.get_pixel(0, 0);
         assert_eq!((p[0], p[1], p[2], p[3]), (0, 0, 0, 99));
+    }
+
+    // ---------- adjust_contrast ----------
+
+    #[test]
+    fn contrast_zero_is_identity() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 150, 200, 77));
+        let out = adjust_contrast(&img, 0.0);
+        let p = out.get_pixel(0, 0);
+        assert_eq!((p[0], p[1], p[2], p[3]), (100, 150, 200, 77));
+    }
+
+    #[test]
+    fn contrast_positive() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 128, 200, 255));
+        let out = adjust_contrast(&img, 50.0);
+        let p = out.get_pixel(0, 0);
+        let f = |c: u8| -> u8 {
+            ((f64::from(c) - 128.0) * 1.5 + 128.0).round().clamp(0.0, 255.0) as u8
+        };
+        assert_eq!(p[0], f(100));
+        assert_eq!(p[1], f(128));
+        assert_eq!(p[2], f(200));
+    }
+
+    #[test]
+    fn contrast_negative() {
+        let img = RgbaImage::from_pixel(1, 1, px(50, 128, 220, 255));
+        let out = adjust_contrast(&img, -50.0);
+        let p = out.get_pixel(0, 0);
+        let f = |c: u8| -> u8 {
+            ((f64::from(c) - 128.0) * 0.5 + 128.0).round().clamp(0.0, 255.0) as u8
+        };
+        assert_eq!(p[0], f(50));
+        assert_eq!(p[1], f(128));
+        assert_eq!(p[2], f(220));
+    }
+
+    #[test]
+    fn contrast_preserves_alpha() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 150, 200, 77));
+        let out = adjust_contrast(&img, 30.0);
+        assert_eq!(out.get_pixel(0, 0)[3], 77);
+    }
+
+    // ---------- adjust_saturation ----------
+
+    #[test]
+    fn saturation_zero_is_identity() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 150, 200, 77));
+        let out = adjust_saturation(&img, 0.0);
+        let p = out.get_pixel(0, 0);
+        assert_eq!((p[0], p[1], p[2], p[3]), (100, 150, 200, 77));
+    }
+
+    #[test]
+    fn saturation_to_grayscale() {
+        let img = RgbaImage::from_pixel(1, 1, px(100, 150, 200, 255));
+        let out = adjust_saturation(&img, -100.0);
+        let p = out.get_pixel(0, 0);
+        let gray = ((100u32 * 299 + 150 * 587 + 200 * 114) / 1000) as u8;
+        assert_eq!((p[0], p[1], p[2]), (gray, gray, gray));
+    }
+
+    #[test]
+    fn saturation_positive_boost() {
+        let img = RgbaImage::from_pixel(1, 1, px(200, 128, 50, 255));
+        let out = adjust_saturation(&img, 100.0);
+        let p = out.get_pixel(0, 0);
+        let _gray = ((200u32 * 299 + 128 * 587 + 50 * 114) / 1000) as u8;
+        assert!(p[0] >= 200);
+        assert!(p[2] <= 50);
+        assert_eq!(p[3], 255);
     }
 
     // ---------- invert_keep_alpha ----------

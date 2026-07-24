@@ -5,21 +5,27 @@ import { DEFAULT_CONFIG } from "../types";
 defineProps<{
   enhancement: number;
   reduction: number;
+  contrast: number;
+  saturation: number;
 }>();
 
 const emit = defineEmits<{
   "update:enhancement": [value: number];
   "update:reduction": [value: number];
+  "update:contrast": [value: number];
+  "update:saturation": [value: number];
 }>();
 
 function resetDefaults() {
   emit("update:enhancement", DEFAULT_CONFIG.brightnessEnhancement);
   emit("update:reduction", DEFAULT_CONFIG.brightnessReduction);
+  emit("update:contrast", DEFAULT_CONFIG.contrast);
+  emit("update:saturation", DEFAULT_CONFIG.saturation);
 }
 </script>
 
 <template>
-  <n-card title="亮度参数" size="small">
+  <n-card title="图像参数" size="small">
     <template #header-extra>
       <n-button size="tiny" quaternary @click="resetDefaults">恢复默认</n-button>
     </template>
@@ -72,6 +78,56 @@ function resetDefaults() {
           </div>
         </n-form-item>
         <n-text depth="3" style="font-size: 12px">越接近 -100，点开大图后里图越暗（对比更强）。</n-text>
+      </div>
+
+      <div>
+        <n-form-item label="对比度 (-100 ~ 100)" :show-feedback="false">
+          <div class="slider-row">
+            <n-slider
+              class="slider"
+              :value="contrast"
+              :min="-100"
+              :max="100"
+              :step="1"
+              @update:value="(v) => emit('update:contrast', Number(v))"
+            />
+            <n-input-number
+              :value="contrast"
+              :min="-100"
+              :max="100"
+              :step="1"
+              size="small"
+              class="num-input"
+              @update:value="(v) => emit('update:contrast', Number(v ?? 0))"
+            />
+          </div>
+        </n-form-item>
+        <n-text depth="3" style="font-size: 12px">增强图像明暗差异。0 为不变，负值降低对比度。</n-text>
+      </div>
+
+      <div>
+        <n-form-item label="饱和度 (-100 ~ 100)" :show-feedback="false">
+          <div class="slider-row">
+            <n-slider
+              class="slider"
+              :value="saturation"
+              :min="-100"
+              :max="100"
+              :step="1"
+              @update:value="(v) => emit('update:saturation', Number(v))"
+            />
+            <n-input-number
+              :value="saturation"
+              :min="-100"
+              :max="100"
+              :step="1"
+              size="small"
+              class="num-input"
+              @update:value="(v) => emit('update:saturation', Number(v ?? 0))"
+            />
+          </div>
+        </n-form-item>
+        <n-text depth="3" style="font-size: 12px">调整色彩鲜艳程度。0 为不变，-100 转为灰度。</n-text>
       </div>
     </n-space>
   </n-card>

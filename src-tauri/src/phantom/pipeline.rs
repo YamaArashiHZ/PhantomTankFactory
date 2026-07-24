@@ -112,8 +112,14 @@ pub fn compose_phantom_tank(
     inner: &RgbaImage,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
 ) -> RgbaImage {
     let (surface, inner) = ops::resize_and_pad(surface, inner);
+    let surface = ops::adjust_contrast(&surface, contrast);
+    let inner = ops::adjust_contrast(&inner, contrast);
+    let surface = ops::adjust_saturation(&surface, saturation);
+    let inner = ops::adjust_saturation(&inner, saturation);
     let gray_surface = ops::grayscale_keep_alpha(&surface);
     let gray_inner = ops::grayscale_keep_alpha(&inner);
 
@@ -133,6 +139,8 @@ fn compose_from_paths(
     inner_path: &Path,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
     max_edge: Option<u32>,
 ) -> Result<RgbaImage, ProcessError> {
     let surface_full = load_rgba(surface_path)?;
@@ -152,6 +160,8 @@ fn compose_from_paths(
         &inner,
         brightness_enhancement,
         brightness_reduction,
+        contrast,
+        saturation,
     ))
 }
 
@@ -161,6 +171,8 @@ pub fn process_phantom_tank(
     inner_path: &Path,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
     output_dir: &Path,
 ) -> Result<PathBuf, ProcessError> {
     let result = compose_from_paths(
@@ -168,6 +180,8 @@ pub fn process_phantom_tank(
         inner_path,
         brightness_enhancement,
         brightness_reduction,
+        contrast,
+        saturation,
         None,
     )?;
 
@@ -207,6 +221,8 @@ pub fn preview_phantom_tank(
     inner_path: &Path,
     brightness_enhancement: f64,
     brightness_reduction: f64,
+    contrast: f64,
+    saturation: f64,
     max_edge: u32,
 ) -> Result<(String, String), ProcessError> {
     let result = compose_from_paths(
@@ -214,6 +230,8 @@ pub fn preview_phantom_tank(
         inner_path,
         brightness_enhancement,
         brightness_reduction,
+        contrast,
+        saturation,
         if max_edge == 0 { None } else { Some(max_edge) },
     )?;
 
@@ -268,7 +286,7 @@ mod tests {
     fn compose_does_not_panic() {
         let surface = solid_rgba(4, 4, 255, 200, 150, 255);
         let inner = solid_rgba(4, 4, 100, 50, 200, 255);
-        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0);
         assert_eq!(result.dimensions(), (4, 4));
     }
 
@@ -276,7 +294,7 @@ mod tests {
     fn compose_different_sizes() {
         let surface = solid_rgba(8, 6, 255, 0, 0, 255);
         let inner = solid_rgba(2, 2, 0, 255, 0, 255);
-        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0);
         let (w, h) = result.dimensions();
         assert!(w >= 2);
         assert!(h >= 2);

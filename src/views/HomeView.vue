@@ -6,6 +6,7 @@ import {
   NSpace,
   NInput,
   NIcon,
+  NProgress,
   useMessage,
 } from "naive-ui";
 import {
@@ -40,6 +41,8 @@ const message = useMessage();
 const {
   brightnessEnhancement,
   brightnessReduction,
+  contrast,
+  saturation,
   exportDirectory,
   previewQuality,
   previewEnabled,
@@ -89,7 +92,7 @@ const {
   previewReady,
 } = useEffectPreview(surfacePath, innerPath);
 
-const { processing, canProcess, process } = useExport(surfacePath, innerPath);
+const { processing, canProcess, progress, progressVisible, process } = useExport(surfacePath, innerPath);
 
 function setEnhancement(v: number) {
   brightnessEnhancement.value = v;
@@ -97,6 +100,14 @@ function setEnhancement(v: number) {
 
 function setReduction(v: number) {
   brightnessReduction.value = v;
+}
+
+function setContrast(v: number) {
+  contrast.value = v;
+}
+
+function setSaturation(v: number) {
+  saturation.value = v;
 }
 
 function setPreviewQuality(q: PreviewQuality) {
@@ -155,8 +166,12 @@ async function openExportDir() {
       <BrightnessPanel
         :enhancement="brightnessEnhancement"
         :reduction="brightnessReduction"
+        :contrast="contrast"
+        :saturation="saturation"
         @update:enhancement="setEnhancement"
         @update:reduction="setReduction"
+        @update:contrast="setContrast"
+        @update:saturation="setSaturation"
       />
 
       <EffectPreview
@@ -193,7 +208,7 @@ async function openExportDir() {
             </n-button>
           </div>
 
-          <n-space>
+          <div class="export-action">
             <n-button
               type="primary"
               size="large"
@@ -206,7 +221,15 @@ async function openExportDir() {
               </template>
               生成幻影坦克
             </n-button>
-          </n-space>
+            <n-progress
+              v-if="progressVisible"
+              type="line"
+              :percentage="progress"
+              :height="12"
+              :border-radius="4"
+              style="flex: 1; min-width: 120px"
+            />
+          </div>
         </n-space>
       </n-card>
     </n-space>
@@ -245,6 +268,13 @@ async function openExportDir() {
 .export-row {
   display: flex;
   gap: 10px;
+  width: 100%;
+}
+
+.export-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
   width: 100%;
 }
 

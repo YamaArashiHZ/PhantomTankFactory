@@ -5,6 +5,26 @@ import { NButton, useMessage, useNotification } from "naive-ui";
 import type { ProcessResult } from "../types";
 import { useAppConfig } from "./useAppConfig";
 
+function startSimulatedProgress(
+  progress: Ref<number>,
+  stopSignal: Ref<boolean>,
+) {
+  let start = Date.now();
+
+  function tick() {
+    if (stopSignal.value) {
+      progress.value = 100;
+      return;
+    }
+    const elapsed = (Date.now() - start) / 1000;
+    const pct = 1 - 1 / (1 + elapsed * 0.6);
+    progress.value = Math.min(Math.round(pct * 90), 90);
+    requestAnimationFrame(tick);
+  }
+
+  requestAnimationFrame(tick);
+}
+
 /** 导出流程：合成幻影坦克并以底部横幅通知结果。 */
 export function useExport(
   surfacePath: Ref<string | null>,
@@ -12,10 +32,13 @@ export function useExport(
 ) {
   const message = useMessage();
   const notification = useNotification();
-  const { brightnessEnhancement, brightnessReduction, exportDirectory } =
+  const { brightnessEnhancement, brightnessReduction, contrast, saturation, exportDirectory } =
     useAppConfig();
 
   const processing = ref(false);
+  const progress = ref(0);
+  const progressVisible = ref(false);
+  const stopProgress = ref(false);
 
   const canProcess = computed(
     () => !!surfacePath.value && !!innerPath.value && !processing.value,
@@ -54,12 +77,20 @@ export function useExport(
       return;
     }
     processing.value = true;
+    progress.value = 0;
+    progressVisible.value = true;
+    stopProgress.value = false;
+
+    startSimulatedProgress(progress, stopProgress);
+
     try {
       const result = await invoke<ProcessResult>("process_phantom_tank", {
         surfacePath: surfacePath.value,
         innerPath: innerPath.value,
         brightnessEnhancement: brightnessEnhancement.value,
         brightnessReduction: brightnessReduction.value,
+        contrast: contrast.value,
+        saturation: saturation.value,
         exportDirectory: exportDirectory.value || "",
       });
       showExportDoneBanner(result.outputPath);
@@ -71,13 +102,18 @@ export function useExport(
         duration: 5000,
       });
     } finally {
+      stopProgress.value = true;
+      await new Promise((r) => setTimeout(r, 400));
       processing.value = false;
+      progressVisible.value = false;
     }
   }
 
   return {
     processing,
     canProcess,
+    progress,
+    progressVisible,
     process,
   };
 }
