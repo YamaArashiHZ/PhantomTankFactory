@@ -56,12 +56,12 @@ describe("clampConfig", () => {
   });
 
   it("rejects invalid theme", () => {
-    const result = clampConfig({ theme: "blue" } as Partial<AppConfig>);
+    const result = clampConfig({ theme: "blue" } as unknown as Partial<AppConfig>);
     expect(result.theme).toBe(DEFAULT_CONFIG.theme);
   });
 
   it("rejects invalid previewQuality", () => {
-    const result = clampConfig({ previewQuality: "ultra" } as Partial<AppConfig>);
+    const result = clampConfig({ previewQuality: "ultra" } as unknown as Partial<AppConfig>);
     expect(result.previewQuality).toBe(DEFAULT_CONFIG.previewQuality);
   });
 

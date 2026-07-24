@@ -139,14 +139,14 @@ async function openExportDir() {
         <ImagePickerCard
           v-model:path="surfacePath"
           title="表图"
-          hint="缩略图 / 未点开时显示"
+          hint="拖放或点击选择表图"
           :box-aspect="sharedBoxAspect"
           @natural-size="onSurfaceNatural"
         />
         <ImagePickerCard
           v-model:path="innerPath"
           title="里图"
-          hint="点开原图后显示"
+          hint="拖放或点击选择里图"
           :box-aspect="sharedBoxAspect"
           @natural-size="onInnerNatural"
         />

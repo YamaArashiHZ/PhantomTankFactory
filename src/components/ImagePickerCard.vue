@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, ref, watch } from "vue";
 import { NCard, NButton, NText, NIcon, NEmpty } from "naive-ui";
 import { ImageOutline, CloseCircleOutline } from "@vicons/ionicons5";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useDragDrop } from "../composables/useDragDrop";
 
 const props = defineProps<{
   title: string;
@@ -20,6 +21,14 @@ const emit = defineEmits<{
 }>();
 
 const DEFAULT_ASPECT = 16 / 9;
+
+const previewBoxRef = ref<HTMLElement | null>(null);
+
+function onFileDrop(droppedPath: string) {
+  emit("update:path", droppedPath);
+}
+
+const { isDragOver } = useDragDrop(previewBoxRef, onFileDrop);
 
 const previewUrl = computed(() => (props.path ? convertFileSrc(props.path) : ""));
 const fileName = computed(() => {
@@ -95,8 +104,9 @@ function clear() {
     </template>
 
     <div
+      ref="previewBoxRef"
       class="preview-box"
-      :class="{ empty: !path }"
+      :class="{ empty: !path, 'drag-over': isDragOver }"
       :style="previewBoxStyle"
       @click="pickImage"
       role="button"
@@ -179,6 +189,12 @@ function clear() {
 
 .preview-box:hover {
   border-color: var(--primary-soft);
+}
+
+.preview-box.drag-over {
+  border-color: var(--primary-soft);
+  border-style: solid;
+  background: rgba(91, 124, 250, 0.08);
 }
 
 .preview-img {

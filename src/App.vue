@@ -16,7 +16,10 @@ import HomeView from "./views/HomeView.vue";
 import PreviewView from "./views/PreviewView.vue";
 import AboutView from "./views/AboutView.vue";
 import { useAppConfig, loadAppConfig } from "./composables/useAppConfig";
+import { isGlobalDragActive, dragHoles } from "./composables/useDragDrop";
 import type { AppPage } from "./types";
+
+const holeRects = computed(() => [...dragHoles.values()]);
 
 const page = ref<AppPage>("home");
 const { theme, toggleTheme } = useAppConfig();
@@ -202,6 +205,37 @@ onBeforeUnmount(() => {
       </n-message-provider>
     </n-notification-provider>
   </n-config-provider>
+
+  <Teleport to="body">
+    <svg
+      v-if="isGlobalDragActive"
+      class="drag-shield"
+      width="100%"
+      height="100%"
+    >
+      <defs>
+        <mask id="drag-shield-mask">
+          <rect width="100%" height="100%" fill="white" />
+          <rect
+            v-for="(hole, i) in holeRects"
+            :key="i"
+            :x="hole.x"
+            :y="hole.y"
+            :width="hole.w"
+            :height="hole.h"
+            rx="12"
+            fill="black"
+          />
+        </mask>
+      </defs>
+      <rect
+        width="100%"
+        height="100%"
+        fill="rgba(0, 0, 0, 0.25)"
+        mask="url(#drag-shield-mask)"
+      />
+    </svg>
+  </Teleport>
 </template>
 
 <style>
@@ -302,5 +336,20 @@ onBeforeUnmount(() => {
   transition:
     background 0.2s ease,
     opacity 0.2s ease;
+}
+</style>
+
+<style>
+.drag-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  pointer-events: none;
+  animation: shield-fade 0.15s ease;
+}
+
+@keyframes shield-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style>

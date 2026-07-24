@@ -12,6 +12,7 @@ import {
 import { CloseCircleOutline, FolderOpenOutline } from "@vicons/ionicons5";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { useDragDrop } from "../composables/useDragDrop";
 
 /** 与选图区相同：宽高比 9:16 ~ 16:9 */
 const ASPECT_MAX = 16 / 9;
@@ -22,6 +23,14 @@ const message = useMessage();
 const imagePath = ref<string | null>(null);
 const naturalW = ref(0);
 const naturalH = ref(0);
+
+const previewCardRef = ref<HTMLElement | null>(null);
+
+function onFileDrop(droppedPath: string) {
+  imagePath.value = droppedPath;
+}
+
+const { isDragOver } = useDragDrop(previewCardRef, onFileDrop);
 
 const previewUrl = computed(() =>
   imagePath.value ? convertFileSrc(imagePath.value) : "",
@@ -88,7 +97,7 @@ function onImgError() {
   <div class="preview-page">
     <h1 class="page-title">效果查看</h1>
     <p class="page-subtitle">
-      选择已生成的幻影坦克 PNG，在白底 / 黑底下查看表图与里图效果。
+      拖放或选择已生成的幻影坦克 PNG，在白底 / 黑底下查看表图与里图效果。
     </p>
 
     <n-space vertical :size="16" style="width: 100%">
@@ -98,7 +107,7 @@ function onImgError() {
             {{ imagePath ? fileName : "未选择文件" }}
           </n-text>
           <n-space :size="8">
-            <n-button v-if="imagePath" quaternary size="small" @click="clear">
+            <n-button v-if="imagePath" quaternary class="clear-btn" @click="clear">
               <template #icon>
                 <n-icon :component="CloseCircleOutline" />
               </template>
@@ -115,9 +124,14 @@ function onImgError() {
       </n-card>
 
       <n-card title="效果预览" size="small">
-        <div v-if="!imagePath" class="empty-wrap">
-          <n-empty description="请选择幻影坦克" size="small" />
-        </div>
+        <div
+          ref="previewCardRef"
+          class="preview-drop-zone"
+          :class="{ 'drag-over': isDragOver }"
+        >
+          <div v-if="!imagePath" class="empty-wrap">
+            <n-empty description="拖放或点击选择幻影坦克" size="small" />
+          </div>
         <div v-else class="preview-grid">
           <div class="pane">
             <div class="pane-label">表图效果（白底 / 缩略图）</div>
@@ -144,6 +158,7 @@ function onImgError() {
                 draggable="false"
               />
             </div>
+          </div>
           </div>
         </div>
       </n-card>
@@ -190,10 +205,11 @@ function onImgError() {
 
 .pane {
   min-width: 0;
-  width: 100%;
+  width: calc(100% - 5%);
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin: 2.5%;
 }
 
 .pane-label {
@@ -221,6 +237,17 @@ function onImgError() {
   background: #0a0a0a;
 }
 
+.clear-btn {
+  --n-text-color: #FF0000 !important;
+  --n-text-color-hover: #FF3333 !important;
+  --n-text-color-pressed: #CC0000 !important;
+  --n-text-color-focus: #FF0000 !important;
+}
+
+.clear-btn :deep(.n-icon) {
+  color: #FF0000 !important;
+}
+
 .pane-img {
   display: block;
   width: 100%;
@@ -231,6 +258,17 @@ function onImgError() {
   object-position: center;
   pointer-events: none;
   user-select: none;
+}
+
+.preview-drop-zone {
+  border-radius: 12px;
+  transition: outline-color 0.2s, background 0.2s;
+}
+
+.preview-drop-zone.drag-over {
+  outline: 2px solid #5b7cfa;
+  outline-offset: -2px;
+  background: rgba(91, 124, 250, 0.06);
 }
 
 @media (max-width: 720px) {
