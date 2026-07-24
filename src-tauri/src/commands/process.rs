@@ -46,6 +46,7 @@ pub async fn process_phantom_tank<R: Runtime>(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    color_mode: String,
     export_directory: String,
 ) -> Result<ProcessResult, String> {
     validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
@@ -69,9 +70,10 @@ pub async fn process_phantom_tank<R: Runtime>(
     let reduction = brightness_reduction;
     let ct = contrast;
     let sat = saturation;
+    let is_color = color_mode == "color";
 
     let path = tauri::async_runtime::spawn_blocking(move || {
-        phantom::process_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, &output_dir)
+        phantom::process_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, is_color, &output_dir)
             .map_err(|e| e.to_string())
     })
     .await
@@ -90,6 +92,7 @@ pub async fn preview_phantom_tank(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    color_mode: String,
     max_edge: u32,
 ) -> Result<PreviewResult, String> {
     validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
@@ -107,9 +110,10 @@ pub async fn preview_phantom_tank(
     let reduction = brightness_reduction;
     let ct = contrast;
     let sat = saturation;
+    let is_color = color_mode == "color";
 
     let (surface_preview, inner_preview) = tauri::async_runtime::spawn_blocking(move || {
-        phantom::preview_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, max_edge)
+        phantom::preview_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, is_color, max_edge)
             .map_err(|e| e.to_string())
     })
     .await

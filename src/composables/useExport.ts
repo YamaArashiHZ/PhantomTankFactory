@@ -32,7 +32,7 @@ export function useExport(
 ) {
   const message = useMessage();
   const notification = useNotification();
-  const { brightnessEnhancement, brightnessReduction, contrast, saturation, exportDirectory } =
+  const { brightnessEnhancement, brightnessReduction, contrast, saturation, colorMode, exportDirectory } =
     useAppConfig();
 
   const processing = ref(false);
@@ -91,6 +91,7 @@ export function useExport(
         brightnessReduction: brightnessReduction.value,
         contrast: contrast.value,
         saturation: saturation.value,
+        colorMode: colorMode.value,
         exportDirectory: exportDirectory.value || "",
       });
       showExportDoneBanner(result.outputPath);

@@ -114,22 +114,45 @@ pub fn compose_phantom_tank(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    is_color: bool,
 ) -> RgbaImage {
     let (surface, inner) = ops::resize_and_pad(surface, inner);
     let surface = ops::adjust_contrast(&surface, contrast);
     let inner = ops::adjust_contrast(&inner, contrast);
     let surface = ops::adjust_saturation(&surface, saturation);
     let inner = ops::adjust_saturation(&inner, saturation);
+
+    // 始终计算灰度管线获取 Alpha 通道
     let gray_surface = ops::grayscale_keep_alpha(&surface);
     let gray_inner = ops::grayscale_keep_alpha(&inner);
+    let bright_gray_surface = ops::adjust_brightness(&gray_surface, brightness_enhancement);
+    let bright_gray_inner = ops::adjust_brightness(&gray_inner, brightness_reduction);
+    let inverted_gray_surface = ops::invert_keep_alpha(&bright_gray_surface);
+    let dodged_gray = ops::linear_dodge(&inverted_gray_surface, &bright_gray_inner);
+    let divided_gray = ops::divide(&bright_gray_inner, &dodged_gray);
+    let alpha_image = ops::apply_red_as_alpha(&dodged_gray, &divided_gray);
 
-    let bright_surface = ops::adjust_brightness(&gray_surface, brightness_enhancement);
-    let bright_inner = ops::adjust_brightness(&gray_inner, brightness_reduction);
+    if !is_color {
+        return alpha_image;
+    }
 
+    // 彩色模式：用彩色原图再跑一次管线获取 RGB，结合灰度 Alpha
+    let bright_surface = ops::adjust_brightness(&surface, brightness_enhancement);
+    let bright_inner = ops::adjust_brightness(&inner, brightness_reduction);
     let inverted_surface = ops::invert_keep_alpha(&bright_surface);
     let dodged = ops::linear_dodge(&inverted_surface, &bright_inner);
     let divided = ops::divide(&bright_inner, &dodged);
-    ops::apply_red_as_alpha(&dodged, &divided)
+
+    let (w, h) = divided.dimensions();
+    let mut color_result = RgbaImage::new(w, h);
+    for y in 0..h {
+        for x in 0..w {
+            let rgb = divided.get_pixel(x, y);
+            let a = alpha_image.get_pixel(x, y);
+            color_result.put_pixel(x, y, Rgba([rgb[0], rgb[1], rgb[2], a[3]]));
+        }
+    }
+    color_result
 }
 
 /// 加载两图并合成幻影坦克 RGBA。
@@ -141,6 +164,7 @@ fn compose_from_paths(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    is_color: bool,
     max_edge: Option<u32>,
 ) -> Result<RgbaImage, ProcessError> {
     let surface_full = load_rgba(surface_path)?;
@@ -162,6 +186,7 @@ fn compose_from_paths(
         brightness_reduction,
         contrast,
         saturation,
+        is_color,
     ))
 }
 
@@ -173,6 +198,7 @@ pub fn process_phantom_tank(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    is_color: bool,
     output_dir: &Path,
 ) -> Result<PathBuf, ProcessError> {
     let result = compose_from_paths(
@@ -182,6 +208,7 @@ pub fn process_phantom_tank(
         brightness_reduction,
         contrast,
         saturation,
+        is_color,
         None,
     )?;
 
@@ -223,6 +250,7 @@ pub fn preview_phantom_tank(
     brightness_reduction: f64,
     contrast: f64,
     saturation: f64,
+    is_color: bool,
     max_edge: u32,
 ) -> Result<(String, String), ProcessError> {
     let result = compose_from_paths(
@@ -232,6 +260,7 @@ pub fn preview_phantom_tank(
         brightness_reduction,
         contrast,
         saturation,
+        is_color,
         if max_edge == 0 { None } else { Some(max_edge) },
     )?;
 
@@ -286,7 +315,7 @@ mod tests {
     fn compose_does_not_panic() {
         let surface = solid_rgba(4, 4, 255, 200, 150, 255);
         let inner = solid_rgba(4, 4, 100, 50, 200, 255);
-        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0, false);
         assert_eq!(result.dimensions(), (4, 4));
     }
 
@@ -294,10 +323,24 @@ mod tests {
     fn compose_different_sizes() {
         let surface = solid_rgba(8, 6, 255, 0, 0, 255);
         let inner = solid_rgba(2, 2, 0, 255, 0, 255);
-        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0, false);
         let (w, h) = result.dimensions();
         assert!(w >= 2);
         assert!(h >= 2);
+    }
+
+    #[test]
+    fn compose_color_mode_retains_color() {
+        let surface = solid_rgba(4, 4, 255, 128, 64, 255);
+        let inner = solid_rgba(4, 4, 64, 200, 128, 255);
+        let result = compose_phantom_tank(&surface, &inner, 50.0, -50.0, 0.0, 0.0, true);
+        let mut max_diff = 0u32;
+        for (_, _, p) in result.enumerate_pixels() {
+            max_diff = max_diff.max(
+                (p[0] as i32 - p[1] as i32).unsigned_abs()
+            );
+        }
+        assert!(max_diff > 0, "color mode should produce non-gray pixels");
     }
 
     // ---------- alpha_on_solid ----------

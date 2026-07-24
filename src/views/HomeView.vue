@@ -23,7 +23,7 @@ import EffectPreview from "../components/EffectPreview.vue";
 import { useAppConfig } from "../composables/useAppConfig";
 import { useEffectPreview } from "../composables/useEffectPreview";
 import { useExport } from "../composables/useExport";
-import type { PreviewQuality } from "../types";
+import type { PreviewQuality, ColorMode } from "../types";
 
 /** 横/竖比例上限 16:9 → 宽高比夹在 9:16 ~ 16:9 */
 const ASPECT_MAX = 16 / 9;
@@ -43,6 +43,7 @@ const {
   brightnessReduction,
   contrast,
   saturation,
+  colorMode,
   exportDirectory,
   previewQuality,
   previewEnabled,
@@ -110,6 +111,10 @@ function setSaturation(v: number) {
   saturation.value = v;
 }
 
+function setColorMode(v: ColorMode) {
+  colorMode.value = v;
+}
+
 function setPreviewQuality(q: PreviewQuality) {
   previewQuality.value = q;
 }
@@ -168,10 +173,12 @@ async function openExportDir() {
         :reduction="brightnessReduction"
         :contrast="contrast"
         :saturation="saturation"
+        :color-mode="colorMode"
         @update:enhancement="setEnhancement"
         @update:reduction="setReduction"
         @update:contrast="setContrast"
         @update:saturation="setSaturation"
+        @update:color-mode="setColorMode"
       />
 
       <EffectPreview

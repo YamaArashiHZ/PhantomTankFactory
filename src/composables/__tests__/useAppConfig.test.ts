@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { clampConfig } from "../useAppConfig";
-import { DEFAULT_CONFIG, type AppConfig } from "../../types";
+import { DEFAULT_CONFIG, DEFAULT_MODE_PARAMS, type AppConfig } from "../../types";
 
 describe("clampConfig", () => {
   it("returns defaults when passed null", () => {
@@ -20,39 +20,71 @@ describe("clampConfig", () => {
 
   it("keeps valid values", () => {
     const result = clampConfig({
-      brightnessEnhancement: 75,
-      brightnessReduction: -25,
       theme: "dark",
       exportDirectory: "/some/path",
       previewQuality: "high",
       previewEnabled: false,
-    });
-    expect(result.brightnessEnhancement).toBe(75);
-    expect(result.brightnessReduction).toBe(-25);
+      colorMode: "color",
+    } as Partial<AppConfig>);
     expect(result.theme).toBe("dark");
     expect(result.exportDirectory).toBe("/some/path");
     expect(result.previewQuality).toBe("high");
     expect(result.previewEnabled).toBe(false);
+    expect(result.colorMode).toBe("color");
   });
 
-  it("clamps brightnessEnhancement above 100", () => {
-    const result = clampConfig({ brightnessEnhancement: 150 });
-    expect(result.brightnessEnhancement).toBe(DEFAULT_CONFIG.brightnessEnhancement);
+  it("clamps grayscale brightnessEnhancement above 100", () => {
+    const result = clampConfig({
+      grayscaleParams: { brightnessEnhancement: 150 },
+    } as any);
+    expect(result.grayscaleParams.brightnessEnhancement).toBe(
+      DEFAULT_MODE_PARAMS.brightnessEnhancement,
+    );
   });
 
-  it("clamps brightnessEnhancement below 0", () => {
-    const result = clampConfig({ brightnessEnhancement: -10 });
-    expect(result.brightnessEnhancement).toBe(DEFAULT_CONFIG.brightnessEnhancement);
+  it("clamps color brightnessReduction below -100", () => {
+    const result = clampConfig({
+      colorParams: { brightnessReduction: -200 },
+    } as any);
+    expect(result.colorParams.brightnessReduction).toBe(
+      DEFAULT_MODE_PARAMS.brightnessReduction,
+    );
   });
 
-  it("clamps brightnessReduction below -100", () => {
-    const result = clampConfig({ brightnessReduction: -200 });
-    expect(result.brightnessReduction).toBe(DEFAULT_CONFIG.brightnessReduction);
+  it("clamps contrast outside range in grayscaleParams", () => {
+    const result = clampConfig({
+      grayscaleParams: { contrast: 150 },
+    } as any);
+    expect(result.grayscaleParams.contrast).toBe(DEFAULT_MODE_PARAMS.contrast);
   });
 
-  it("clamps brightnessReduction above 0", () => {
-    const result = clampConfig({ brightnessReduction: 50 });
-    expect(result.brightnessReduction).toBe(DEFAULT_CONFIG.brightnessReduction);
+  it("clamps saturation outside range in colorParams", () => {
+    const result = clampConfig({
+      colorParams: { saturation: -200 },
+    } as any);
+    expect(result.colorParams.saturation).toBe(
+      DEFAULT_MODE_PARAMS.saturation,
+    );
+  });
+
+  it("keeps valid grayscale params", () => {
+    const result = clampConfig({
+      grayscaleParams: { contrast: 30, saturation: -10, brightnessEnhancement: 70, brightnessReduction: -40 },
+    } as any);
+    expect(result.grayscaleParams.contrast).toBe(30);
+    expect(result.grayscaleParams.saturation).toBe(-10);
+    expect(result.grayscaleParams.brightnessEnhancement).toBe(70);
+    expect(result.grayscaleParams.brightnessReduction).toBe(-40);
+  });
+
+  it("keeps valid color params", () => {
+    const result = clampConfig({
+      colorParams: { contrast: 50, saturation: -30, brightnessEnhancement: 60, brightnessReduction: -20 },
+    } as any);
+    expect(result.colorParams.contrast).toBe(50);
+    expect(result.colorParams.saturation).toBe(-30);
+    expect(result.colorParams.brightnessEnhancement).toBe(60);
+    expect(result.colorParams.brightnessReduction).toBe(-20);
   });
 
   it("rejects invalid theme", () => {
@@ -75,30 +107,15 @@ describe("clampConfig", () => {
     expect(result.exportDirectory).toBe("");
   });
 
+  it("rejects invalid colorMode", () => {
+    const result = clampConfig({ colorMode: "rgb" } as unknown as Partial<AppConfig>);
+    expect(result.colorMode).toBe(DEFAULT_CONFIG.colorMode);
+  });
+
   it("fills in missing fields with defaults", () => {
     const result = clampConfig({ theme: "dark" });
     expect(result.theme).toBe("dark");
-    expect(result.brightnessEnhancement).toBe(DEFAULT_CONFIG.brightnessEnhancement);
-    expect(result.brightnessReduction).toBe(DEFAULT_CONFIG.brightnessReduction);
-    expect(result.contrast).toBe(DEFAULT_CONFIG.contrast);
-    expect(result.saturation).toBe(DEFAULT_CONFIG.saturation);
-    expect(result.previewQuality).toBe(DEFAULT_CONFIG.previewQuality);
-    expect(result.previewEnabled).toBe(DEFAULT_CONFIG.previewEnabled);
-  });
-
-  it("clamps contrast outside range", () => {
-    const result = clampConfig({ contrast: 150 });
-    expect(result.contrast).toBe(DEFAULT_CONFIG.contrast);
-  });
-
-  it("clamps saturation outside range", () => {
-    const result = clampConfig({ saturation: -200 });
-    expect(result.saturation).toBe(DEFAULT_CONFIG.saturation);
-  });
-
-  it("keeps valid contrast and saturation", () => {
-    const result = clampConfig({ contrast: 50, saturation: -30 });
-    expect(result.contrast).toBe(50);
-    expect(result.saturation).toBe(-30);
+    expect(result.grayscaleParams).toEqual(DEFAULT_MODE_PARAMS);
+    expect(result.colorParams).toEqual(DEFAULT_MODE_PARAMS);
   });
 });

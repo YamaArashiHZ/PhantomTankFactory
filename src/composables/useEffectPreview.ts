@@ -19,6 +19,7 @@ export function useEffectPreview(
     brightnessReduction,
     contrast,
     saturation,
+    colorMode,
     previewQuality,
     previewEnabled,
   } = useAppConfig();
@@ -63,6 +64,7 @@ export function useEffectPreview(
         brightnessReduction: brightnessReduction.value,
         contrast: contrast.value,
         saturation: saturation.value,
+        colorMode: colorMode.value,
         maxEdge: edge,
       });
       if (seq !== previewSeq) return;
@@ -100,6 +102,7 @@ export function useEffectPreview(
       brightnessReduction,
       contrast,
       saturation,
+      colorMode,
       previewQuality,
       previewEnabled,
     ],

@@ -12,11 +12,26 @@ export const PREVIEW_QUALITY_EDGE: Record<PreviewQuality, number> = {
   original: 0,
 };
 
-export interface AppConfig {
+export type ColorMode = "grayscale" | "color";
+
+export interface ModeParams {
   brightnessEnhancement: number;
   brightnessReduction: number;
   contrast: number;
   saturation: number;
+}
+
+export const DEFAULT_MODE_PARAMS: ModeParams = {
+  brightnessEnhancement: 50,
+  brightnessReduction: -50,
+  contrast: 0,
+  saturation: 0,
+};
+
+export interface AppConfig {
+  grayscaleParams: ModeParams;
+  colorParams: ModeParams;
+  colorMode: ColorMode;
   exportDirectory: string;
   theme: ThemeMode;
   previewQuality: PreviewQuality;
@@ -25,10 +40,9 @@ export interface AppConfig {
 }
 
 export const DEFAULT_CONFIG: AppConfig = {
-  brightnessEnhancement: 50,
-  brightnessReduction: -50,
-  contrast: 0,
-  saturation: 0,
+  grayscaleParams: { ...DEFAULT_MODE_PARAMS },
+  colorParams: { ...DEFAULT_MODE_PARAMS },
+  colorMode: "grayscale",
   exportDirectory: "",
   theme: "light",
   previewQuality: "medium",
