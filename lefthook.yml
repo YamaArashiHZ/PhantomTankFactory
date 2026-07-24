@@ -1,0 +1,11 @@
+pre-commit:
+  parallel: true
+  commands:
+    rust-fmt:
+      glob: "src-tauri/**/*.rs"
+      run: cargo fmt --all -- --check
+      stage_fixed: false
+    typecheck:
+      glob: "src/**/*.{ts,vue}"
+      run: pnpm exec vue-tsc --noEmit
+      stage_fixed: false

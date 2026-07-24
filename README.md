@@ -1,5 +1,7 @@
 # PhantomTank Factory
 
+[![CI](https://github.com/YamaArashiHZ/PhantomTankFactory/actions/workflows/ci.yml/badge.svg)](https://github.com/YamaArashiHZ/PhantomTankFactory/actions/workflows/ci.yml)
+
 幻影坦克合成工具 —— 选择表图与里图，生成「缩略图看一张、点开看另一张」的 PNG。
 
 > 本仓库当前主开发线为 **Tauri 2 + Vue 3 + Rust** 重写版。
@@ -42,6 +44,16 @@
 pnpm install
 pnpm tauri dev
 ```
+
+### Pre-commit Hooks
+
+安装 [lefthook](https://github.com/evilmartians/lefthook) 后执行：
+
+```bash
+lefthook install
+```
+
+之后每次 `git commit` 自动运行 `cargo fmt --check` + `vue-tsc --noEmit`。
 
 ## 打包
 
