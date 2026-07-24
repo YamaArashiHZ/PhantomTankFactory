@@ -38,6 +38,7 @@ fn validate_params(enhancement: f64, reduction: f64, contrast: f64, saturation: 
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn process_phantom_tank<R: Runtime>(
     app: AppHandle<R>,
     surface_path: String,
@@ -66,14 +67,16 @@ pub async fn process_phantom_tank<R: Runtime>(
         PathBuf::from(export_directory.trim())
     };
 
-    let enhancement = brightness_enhancement;
-    let reduction = brightness_reduction;
-    let ct = contrast;
-    let sat = saturation;
-    let is_color = color_mode == "color";
+    let params = phantom::PhantomParams {
+        brightness_enhancement,
+        brightness_reduction,
+        contrast,
+        saturation,
+        is_color: color_mode == "color",
+    };
 
     let path = tauri::async_runtime::spawn_blocking(move || {
-        phantom::process_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, is_color, &output_dir)
+        phantom::process_phantom_tank(&surface, &inner, &params, &output_dir)
             .map_err(|e| e.to_string())
     })
     .await
@@ -85,6 +88,7 @@ pub async fn process_phantom_tank<R: Runtime>(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn preview_phantom_tank(
     surface_path: String,
     inner_path: String,
@@ -106,14 +110,16 @@ pub async fn preview_phantom_tank(
         return Err(format!("里图不存在: {inner_path}"));
     }
 
-    let enhancement = brightness_enhancement;
-    let reduction = brightness_reduction;
-    let ct = contrast;
-    let sat = saturation;
-    let is_color = color_mode == "color";
+    let params = phantom::PhantomParams {
+        brightness_enhancement,
+        brightness_reduction,
+        contrast,
+        saturation,
+        is_color: color_mode == "color",
+    };
 
     let (surface_preview, inner_preview) = tauri::async_runtime::spawn_blocking(move || {
-        phantom::preview_phantom_tank(&surface, &inner, enhancement, reduction, ct, sat, is_color, max_edge)
+        phantom::preview_phantom_tank(&surface, &inner, &params, max_edge)
             .map_err(|e| e.to_string())
     })
     .await
