@@ -21,7 +21,12 @@ pub struct PreviewResult {
     pub inner_preview: String,
 }
 
-fn validate_params(enhancement: f64, reduction: f64, contrast: f64, saturation: f64) -> Result<(), String> {
+fn validate_params(
+    enhancement: f64,
+    reduction: f64,
+    contrast: f64,
+    saturation: f64,
+) -> Result<(), String> {
     if !(0.0..=100.0).contains(&enhancement) {
         return Err("表图亮度增强须在 0~100".into());
     }
@@ -50,7 +55,12 @@ pub async fn process_phantom_tank<R: Runtime>(
     color_mode: String,
     export_directory: String,
 ) -> Result<ProcessResult, String> {
-    validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
+    validate_params(
+        brightness_enhancement,
+        brightness_reduction,
+        contrast,
+        saturation,
+    )?;
 
     let surface = PathBuf::from(&surface_path);
     let inner = PathBuf::from(&inner_path);
@@ -99,7 +109,12 @@ pub async fn preview_phantom_tank(
     color_mode: String,
     max_edge: u32,
 ) -> Result<PreviewResult, String> {
-    validate_params(brightness_enhancement, brightness_reduction, contrast, saturation)?;
+    validate_params(
+        brightness_enhancement,
+        brightness_reduction,
+        contrast,
+        saturation,
+    )?;
 
     let surface = PathBuf::from(&surface_path);
     let inner = PathBuf::from(&inner_path);

@@ -130,10 +130,8 @@ pub fn compose_phantom_tank(
     // 始终计算灰度管线获取 Alpha 通道
     let gray_surface = ops::grayscale_keep_alpha(&surface);
     let gray_inner = ops::grayscale_keep_alpha(&inner);
-    let bright_gray_surface =
-        ops::adjust_brightness(&gray_surface, params.brightness_enhancement);
-    let bright_gray_inner =
-        ops::adjust_brightness(&gray_inner, params.brightness_reduction);
+    let bright_gray_surface = ops::adjust_brightness(&gray_surface, params.brightness_enhancement);
+    let bright_gray_inner = ops::adjust_brightness(&gray_inner, params.brightness_reduction);
     let inverted_gray_surface = ops::invert_keep_alpha(&bright_gray_surface);
     let dodged_gray = ops::linear_dodge(&inverted_gray_surface, &bright_gray_inner);
     let divided_gray = ops::divide(&bright_gray_inner, &dodged_gray);
@@ -327,9 +325,7 @@ mod tests {
         let result = compose_phantom_tank(&surface, &inner, &color_params());
         let mut max_diff = 0u32;
         for (_, _, p) in result.enumerate_pixels() {
-            max_diff = max_diff.max(
-                (p[0] as i32 - p[1] as i32).unsigned_abs()
-            );
+            max_diff = max_diff.max((p[0] as i32 - p[1] as i32).unsigned_abs());
         }
         assert!(max_diff > 0, "color mode should produce non-gray pixels");
     }

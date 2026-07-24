@@ -58,7 +58,11 @@ pub fn adjust_brightness(image: &RgbaImage, lightness: f64) -> RgbaImage {
         let t = lightness / 100.0;
         for (x, y, px) in image.enumerate_pixels() {
             let blend = |c: u8| (f64::from(c) + t * (255.0 - f64::from(c))).round() as u8;
-            out.put_pixel(x, y, Rgba([blend(px[0]), blend(px[1]), blend(px[2]), px[3]]));
+            out.put_pixel(
+                x,
+                y,
+                Rgba([blend(px[0]), blend(px[1]), blend(px[2]), px[3]]),
+            );
         }
     } else {
         let factor = 1.0 + lightness / 100.0;
@@ -89,8 +93,8 @@ pub fn adjust_saturation(image: &RgbaImage, saturation: f64) -> RgbaImage {
     let mut out = RgbaImage::new(w, h);
     let factor = 1.0 + saturation / 100.0;
     for (x, y, px) in image.enumerate_pixels() {
-        let gray = (u32::from(px[0]) * 299 + u32::from(px[1]) * 587 + u32::from(px[2]) * 114)
-            / 1000;
+        let gray =
+            (u32::from(px[0]) * 299 + u32::from(px[1]) * 587 + u32::from(px[2]) * 114) / 1000;
         let s = |c: u8| -> u8 {
             let v = f64::from(gray) + (f64::from(c) - f64::from(gray)) * factor;
             v.round().clamp(0.0, 255.0) as u8
@@ -308,7 +312,9 @@ mod tests {
         let out = adjust_contrast(&img, 50.0);
         let p = out.get_pixel(0, 0);
         let f = |c: u8| -> u8 {
-            ((f64::from(c) - 128.0) * 1.5 + 128.0).round().clamp(0.0, 255.0) as u8
+            ((f64::from(c) - 128.0) * 1.5 + 128.0)
+                .round()
+                .clamp(0.0, 255.0) as u8
         };
         assert_eq!(p[0], f(100));
         assert_eq!(p[1], f(128));
@@ -321,7 +327,9 @@ mod tests {
         let out = adjust_contrast(&img, -50.0);
         let p = out.get_pixel(0, 0);
         let f = |c: u8| -> u8 {
-            ((f64::from(c) - 128.0) * 0.5 + 128.0).round().clamp(0.0, 255.0) as u8
+            ((f64::from(c) - 128.0) * 0.5 + 128.0)
+                .round()
+                .clamp(0.0, 255.0) as u8
         };
         assert_eq!(p[0], f(50));
         assert_eq!(p[1], f(128));
@@ -389,12 +397,46 @@ mod tests {
 
     #[test]
     fn linear_dodge_saturation() {
-        let a = img_2x2([px(200, 100, 50, 255), px(0, 0, 0, 255), px(255, 0, 0, 255), px(10, 20, 30, 255)]);
-        let b = img_2x2([px(100, 200, 50, 128), px(0, 0, 0, 255), px(0, 255, 0, 255), px(40, 30, 20, 128)]);
+        let a = img_2x2([
+            px(200, 100, 50, 255),
+            px(0, 0, 0, 255),
+            px(255, 0, 0, 255),
+            px(10, 20, 30, 255),
+        ]);
+        let b = img_2x2([
+            px(100, 200, 50, 128),
+            px(0, 0, 0, 255),
+            px(0, 255, 0, 255),
+            px(40, 30, 20, 128),
+        ]);
         let out = linear_dodge(&a, &b);
-        assert_eq!((out.get_pixel(0, 0)[0], out.get_pixel(0, 0)[1], out.get_pixel(0, 0)[2], out.get_pixel(0, 0)[3]), (255, 255, 100, 255));
-        assert_eq!((out.get_pixel(1, 0)[0], out.get_pixel(1, 0)[1], out.get_pixel(1, 0)[2], out.get_pixel(1, 0)[3]), (0, 0, 0, 255));
-        assert_eq!((out.get_pixel(0, 1)[0], out.get_pixel(0, 1)[1], out.get_pixel(0, 1)[2], out.get_pixel(0, 1)[3]), (255, 255, 0, 255));
+        assert_eq!(
+            (
+                out.get_pixel(0, 0)[0],
+                out.get_pixel(0, 0)[1],
+                out.get_pixel(0, 0)[2],
+                out.get_pixel(0, 0)[3]
+            ),
+            (255, 255, 100, 255)
+        );
+        assert_eq!(
+            (
+                out.get_pixel(1, 0)[0],
+                out.get_pixel(1, 0)[1],
+                out.get_pixel(1, 0)[2],
+                out.get_pixel(1, 0)[3]
+            ),
+            (0, 0, 0, 255)
+        );
+        assert_eq!(
+            (
+                out.get_pixel(0, 1)[0],
+                out.get_pixel(0, 1)[1],
+                out.get_pixel(0, 1)[2],
+                out.get_pixel(0, 1)[3]
+            ),
+            (255, 255, 0, 255)
+        );
     }
 
     #[test]
@@ -411,12 +453,40 @@ mod tests {
 
     #[test]
     fn divide_basic() {
-        let a = img_2x2([px(128, 255, 0, 255), px(100, 0, 200, 255), px(50, 100, 150, 128), px(255, 128, 64, 255)]);
-        let b = img_2x2([px(64, 128, 255, 128), px(0, 0, 0, 255), px(10, 20, 30, 64), px(128, 255, 64, 255)]);
+        let a = img_2x2([
+            px(128, 255, 0, 255),
+            px(100, 0, 200, 255),
+            px(50, 100, 150, 128),
+            px(255, 128, 64, 255),
+        ]);
+        let b = img_2x2([
+            px(64, 128, 255, 128),
+            px(0, 0, 0, 255),
+            px(10, 20, 30, 64),
+            px(128, 255, 64, 255),
+        ]);
         let out = divide(&a, &b);
-        let d = |base: u8, blend: u8| ((base as u16 * 255) / if blend == 0 { 1 } else { blend as u16 }).min(255) as u8;
-        assert_eq!((out.get_pixel(0, 0)[0], out.get_pixel(0, 0)[1], out.get_pixel(0, 0)[2], out.get_pixel(0, 0)[3]), (d(128, 64), d(255, 128), d(0, 255), 255));
-        assert_eq!((out.get_pixel(0, 1)[0], out.get_pixel(0, 1)[1], out.get_pixel(0, 1)[2], out.get_pixel(0, 1)[3]), (d(50, 10), d(100, 20), d(150, 30), 128));
+        let d = |base: u8, blend: u8| {
+            ((base as u16 * 255) / if blend == 0 { 1 } else { blend as u16 }).min(255) as u8
+        };
+        assert_eq!(
+            (
+                out.get_pixel(0, 0)[0],
+                out.get_pixel(0, 0)[1],
+                out.get_pixel(0, 0)[2],
+                out.get_pixel(0, 0)[3]
+            ),
+            (d(128, 64), d(255, 128), d(0, 255), 255)
+        );
+        assert_eq!(
+            (
+                out.get_pixel(0, 1)[0],
+                out.get_pixel(0, 1)[1],
+                out.get_pixel(0, 1)[2],
+                out.get_pixel(0, 1)[3]
+            ),
+            (d(50, 10), d(100, 20), d(150, 30), 128)
+        );
     }
 
     #[test]
