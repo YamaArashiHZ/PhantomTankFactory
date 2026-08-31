@@ -219,15 +219,15 @@ async function openExportDir() {
               </div>
 
               <!-- 添加里图（卡片样式，可拖入图片） -->
-              <div
-                ref="addSlotRef"
-                class="inner-slot add-slot"
-                :class="{ 'drag-over': addDragOver }"
-                @click="addInner()"
-              >
-                <div class="add-box">
-                  <n-icon :component="AddOutline" :size="26" />
-                  <n-text depth="3" class="add-label">添加里图（可拖入图片）</n-text>
+              <div class="inner-slot add-slot" @click="addInner()">
+                <div
+                  ref="addSlotRef"
+                  class="add-box"
+                  :class="{ 'drag-over': addDragOver }"
+                >
+                  <n-icon :component="AddOutline" :size="34" class="add-icon" />
+                  <n-text depth="3" class="add-label">添加里图</n-text>
+                  <n-text depth="3" class="add-hint">点击或拖入图片</n-text>
                 </div>
               </div>
             </div>
@@ -463,7 +463,9 @@ async function openExportDir() {
 .delay-row {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
 }
 .slot-delay {
   margin-top: 2px;
@@ -473,17 +475,18 @@ async function openExportDir() {
   flex-shrink: 0;
 }
 .delay-input {
-  width: 120px;
+  width: 84px;
 }
 .unit {
   color: var(--n-text-color-3, #999);
   font-size: 12px;
+  flex-shrink: 0;
 }
 .hint {
   font-size: 12px;
 }
 
-/* 添加里图：卡片样式、可拖入 */
+/* 添加里图：仿里图卡片的主按键样式 */
 .add-slot {
   cursor: pointer;
   width: 220px;
@@ -491,27 +494,35 @@ async function openExportDir() {
 .add-box {
   width: 100%;
   aspect-ratio: 1 / 1;
-  border: 1px dashed var(--border-color);
-  border-radius: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border-color);
   background: var(--preview-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--n-text-color-3, #999);
+  cursor: pointer;
   transition: border-color 0.2s, background 0.2s;
 }
-.add-slot:hover .add-box,
-.add-slot.drag-over .add-box {
+.add-box:hover,
+.add-box.drag-over {
   border-color: var(--primary-soft);
-  border-style: solid;
   background: rgba(91, 124, 250, 0.08);
+}
+.add-icon {
+  color: var(--primary-soft);
 }
 .add-label {
   text-align: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+.add-hint {
+  text-align: center;
   font-size: 12px;
-  padding: 0 8px;
+  opacity: 0.8;
 }
 
 /* 参数/导出等行 */
