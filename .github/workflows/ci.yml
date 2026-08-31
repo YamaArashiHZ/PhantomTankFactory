@@ -67,8 +67,8 @@ jobs:
       - name: 安装前端依赖
         run: pnpm install --frozen-lockfile
 
-      - name: TypeScript 类型检查
-        run: pnpm exec vue-tsc --noEmit
+      - name: 前端构建（类型检查 + 打包）
+        run: pnpm build
 
       - name: 前端测试
         run: pnpm test
