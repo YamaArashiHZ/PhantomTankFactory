@@ -1,3 +1,4 @@
+mod apng;
 mod commands;
 mod phantom;
 
@@ -10,6 +11,8 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
+            commands::apng::process_apng,
+            commands::apng::preview_apng,
             commands::process::process_phantom_tank,
             commands::process::preview_phantom_tank,
             commands::paths::get_temp_dir,
