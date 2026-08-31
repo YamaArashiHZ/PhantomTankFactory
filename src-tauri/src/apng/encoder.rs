@@ -44,8 +44,8 @@ fn to_grayscale_alpha(frame: &RgbaImage) -> Vec<u8> {
     let (w, h) = frame.dimensions();
     let mut out = Vec::with_capacity((w * h * 2) as usize);
     for (_, _, p) in frame.enumerate_pixels() {
-        let g = ((u32::from(p[0]) * 299 + u32::from(p[1]) * 587 + u32::from(p[2]) * 114) / 1000)
-            as u8;
+        let g =
+            ((u32::from(p[0]) * 299 + u32::from(p[1]) * 587 + u32::from(p[2]) * 114) / 1000) as u8;
         out.push(g);
         out.push(p[3]);
     }
@@ -73,12 +73,16 @@ pub fn encode_apng(frames: &[RgbaImage], opts: &ApngOpts) -> Result<Vec<u8>, Str
         let mut writer = enc.write_header().map_err(|e| e.to_string())?;
         for (i, frame) in frames.iter().enumerate() {
             let (num, den) = delay_to_frac(opts.delays_ms.get(i).copied().unwrap_or(1000));
-            writer.set_frame_delay(num, den).map_err(|e| e.to_string())?;
+            writer
+                .set_frame_delay(num, den)
+                .map_err(|e| e.to_string())?;
             if opts.grayscale {
                 let data = to_grayscale_alpha(frame);
                 writer.write_image_data(&data).map_err(|e| e.to_string())?;
             } else {
-                writer.write_image_data(frame.as_raw()).map_err(|e| e.to_string())?;
+                writer
+                    .write_image_data(frame.as_raw())
+                    .map_err(|e| e.to_string())?;
             }
         }
         writer.finish().map_err(|e| e.to_string())?;
@@ -127,8 +131,18 @@ mod tests {
             types.push(tstr.to_string());
             match tstr {
                 "acTL" => {
-                    let nframes = u32::from_be_bytes([bytes[off + 8], bytes[off + 9], bytes[off + 10], bytes[off + 11]]);
-                    let nplays = u32::from_be_bytes([bytes[off + 12], bytes[off + 13], bytes[off + 14], bytes[off + 15]]);
+                    let nframes = u32::from_be_bytes([
+                        bytes[off + 8],
+                        bytes[off + 9],
+                        bytes[off + 10],
+                        bytes[off + 11],
+                    ]);
+                    let nplays = u32::from_be_bytes([
+                        bytes[off + 12],
+                        bytes[off + 13],
+                        bytes[off + 14],
+                        bytes[off + 15],
+                    ]);
                     actl = Some((nframes, nplays));
                 }
                 "fcTL" => fctl += 1,
@@ -149,6 +163,7 @@ mod tests {
 
     #[test]
     fn grayscale_produces_half_channels() {
+        let frames = vec![solid(2, 2, 255, 0, 0, 255), solid(2, 2, 0, 255, 0, 255)];
         let opts = ApngOpts {
             width: 2,
             height: 2,
@@ -157,10 +172,7 @@ mod tests {
             grayscale: true,
             delays_ms: vec![300, 300],
         };
-        let bytes = encode_apng(&frames(), &opts).expect("encode grayscale");
-        // 仅校验不报错且仍含 acTL
-        let s = String::from_utf8_lossy(&bytes);
+        let bytes = encode_apng(&frames, &opts).expect("encode grayscale");
         assert!(bytes.windows(4).any(|w| w == b"acTL"));
-        assert!(!s.contains("dummy"));
     }
 }

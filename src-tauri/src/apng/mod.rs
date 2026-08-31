@@ -87,11 +87,7 @@ fn fit_to_canvas(img: &RgbaImage, w: u32, h: u32) -> RgbaImage {
 const SCALES: [f64; 6] = [1.0, 0.85, 0.7, 0.55, 0.42, 0.32];
 
 /// 归一化一组帧到目标画布。
-fn normalize_frames(
-    frames: &[RgbaImage],
-    cw: u32,
-    ch: u32,
-) -> Vec<RgbaImage> {
+fn normalize_frames(frames: &[RgbaImage], cw: u32, ch: u32) -> Vec<RgbaImage> {
     let edge = cw.max(ch);
     frames
         .iter()
@@ -166,7 +162,7 @@ fn converge(
                             if size <= cap {
                                 return (bytes, None);
                             }
-                            if best.as_ref().map_or(true, |(_, s)| size < *s) {
+                            if best.as_ref().is_none_or(|(_, s)| size < *s) {
                                 best = Some((bytes, size));
                             }
                         } else {
@@ -182,9 +178,8 @@ fn converge(
     if let Some((bytes, size)) = best {
         let kb = (size + 512) / 1024;
         let cap = cap_bytes.map(|c| (c + 512) / 1024).unwrap_or(0);
-        let msg = format!(
-            "已尽量小仍约 {kb} KB，未达到上限 {cap} KB；建议减少里图数量或降低分辨率"
-        );
+        let msg =
+            format!("已尽量小仍约 {kb} KB，未达到上限 {cap} KB；建议减少里图数量或降低分辨率");
         (bytes, Some(msg))
     } else {
         (Vec::new(), Some("编码失败".into()))
@@ -210,9 +205,11 @@ pub fn process_apng(
 
     let (bytes, warning) = converge(&frames, base_w, base_h, params);
 
-    std::fs::create_dir_all(output_dir)
-        .map_err(|e| format!("创建目录失败: {e}"))?;
-    let name = format!("PhantomTankAnim_{}.png", chrono::Local::now().format("%y%m%d_%H%M%S"));
+    std::fs::create_dir_all(output_dir).map_err(|e| format!("创建目录失败: {e}"))?;
+    let name = format!(
+        "PhantomTankAnim_{}.png",
+        chrono::Local::now().format("%y%m%d_%H%M%S")
+    );
     let save_path = output_dir.join(name);
     std::fs::write(&save_path, &bytes).map_err(|e| format!("写入失败: {e}"))?;
 
@@ -274,6 +271,18 @@ mod tests {
         RgbaImage::from_pixel(w, h, Rgba([r, g, b, a]))
     }
 
+    /// 确定性噪声图（用于构造「不可压缩」的图，检验大小上限的收敛提示）。
+    fn noise(w: u32, h: u32) -> RgbaImage {
+        let mut img = RgbaImage::new(w, h);
+        let mut x: u32 = 123456789;
+        for (_, _, p) in img.enumerate_pixels_mut() {
+            x = x.wrapping_mul(1103515245).wrapping_add(12345);
+            let v = (x >> 16) as u8;
+            *p = Rgba([v, v.wrapping_mul(3), v ^ 0x5a, 255]);
+        }
+        img
+    }
+
     #[test]
     fn fit_same_canvas_unchanged() {
         let img = solid(4, 4, 10, 20, 30, 255);
@@ -282,13 +291,13 @@ mod tests {
 
     #[test]
     fn fit_contain_forces_canvas() {
-        // 横图铺到竖画布：宽被限制，上下留透明
+        // 横图 8x2 铺到 4x4 画布：等比缩放为 4x1，垂直居中（占 y=1 一行）
         let img = solid(8, 2, 0, 0, 0, 255);
         let out = fit_to_canvas(&img, 4, 4);
         assert_eq!(out.dimensions(), (4, 4));
-        // 中心行不透明，边角透明
-        assert_eq!(out.get_pixel(2, 2)[3], 255);
-        assert_eq!(out.get_pixel(0, 0)[3], 0);
+        assert_eq!(out.get_pixel(2, 1)[3], 255, "中心行应不透明");
+        assert_eq!(out.get_pixel(0, 0)[3], 0, "上边角应透明");
+        assert_eq!(out.get_pixel(1, 2)[3], 0, "下边角应透明");
     }
 
     #[test]
@@ -331,18 +340,18 @@ mod tests {
 
     #[test]
     fn converge_with_tiny_cap_returns_something() {
-        let frames = vec![solid(400, 400, 255, 0, 0, 255), solid(400, 400, 0, 255, 0, 255)];
+        // 用噪声图保证 1KB 上限无法达成，收敛应返回最小一档并给出提示
+        let frames = vec![noise(400, 400), noise(400, 400)];
         let params = ApngParams {
             surface_delay_ms: 100,
             inner_delays_ms: vec![100],
             num_plays: 0,
             compression: 0,
             grayscale: true,
-            max_size_kb: Some(1), // 1KB 很小，几乎不可能满足
+            max_size_kb: Some(1), // 1KB 太小
         };
         let (bytes, warning) = converge(&frames, 400, 400, &params);
         assert!(!bytes.is_empty());
-        // 达不到上限，应给提示（或至少不 panic）
-        assert!(warning.is_some());
+        assert!(warning.is_some(), "未达上限时应有提示");
     }
 }

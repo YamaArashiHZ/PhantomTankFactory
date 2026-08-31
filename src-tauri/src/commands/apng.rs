@@ -16,7 +16,7 @@ pub struct PreviewApngResult {
 }
 
 fn validate_and_params(
-    surface_path: &str,
+    _surface_path: &str,
     surface_delay_ms: u32,
     inner_paths: &[String],
     inner_delays_ms: &[u32],
@@ -30,7 +30,7 @@ fn validate_and_params(
     if compression > 9 {
         return Err("压缩等级须在 0~9".into());
     }
-    if surface_delay_ms == 0 || inner_delays_ms.iter().any(|&d| d == 0) {
+    if surface_delay_ms == 0 || inner_delays_ms.contains(&0) {
         return Err("显示时长须大于 0".into());
     }
     Ok(ApngParams {
@@ -44,6 +44,7 @@ fn validate_and_params(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn process_apng(
     app: tauri::AppHandle,
     surface_path: String,
@@ -94,6 +95,7 @@ pub async fn process_apng(
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
 pub async fn preview_apng(
     surface_path: String,
     surface_delay_ms: u32,
