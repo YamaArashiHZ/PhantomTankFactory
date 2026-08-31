@@ -24,6 +24,11 @@ export function useApng() {
   const surfacePath = ref<string | null>(null);
   const surfaceDelayMs = ref(DEFAULT_DELAY_MS);
 
+  /** 里图是否统一显示时间 */
+  const unifiedDelay = ref(false);
+  /** 统一显示时长（ms） */
+  const unifiedDelayMs = ref(DEFAULT_DELAY_MS);
+
   const innerFrames = ref<ApngInnerFrame[]>([
     { path: null, delayMs: DEFAULT_DELAY_MS },
   ]);
@@ -47,8 +52,8 @@ export function useApng() {
     () => !!surfacePath.value && filledInners.value >= 1,
   );
 
-  function addInner() {
-    innerFrames.value.push({ path: null, delayMs: DEFAULT_DELAY_MS });
+  function addInner(path?: string | null) {
+    innerFrames.value.push({ path: path ?? null, delayMs: DEFAULT_DELAY_MS });
   }
   function removeInner(i: number) {
     innerFrames.value.splice(i, 1);
@@ -58,10 +63,6 @@ export function useApng() {
   }
   function setInnerDelay(i: number, ms: number) {
     innerFrames.value[i]!.delayMs = ms;
-  }
-  function setAllDelays(ms: number) {
-    surfaceDelayMs.value = ms;
-    for (const f of innerFrames.value) f.delayMs = ms;
   }
   function reorderInner(from: number, to: number) {
     const arr = innerFrames.value;
@@ -90,7 +91,7 @@ export function useApng() {
       .filter((p): p is string => !!p);
     const innerDelaysMs = innerFrames.value
       .filter((f) => f.path)
-      .map((f) => f.delayMs);
+      .map((f) => (unifiedDelay.value ? unifiedDelayMs.value : f.delayMs));
     return {
       surfacePath: surfacePath.value as string,
       surfaceDelayMs: surfaceDelayMs.value,
@@ -187,6 +188,8 @@ export function useApng() {
   return {
     surfacePath,
     surfaceDelayMs,
+    unifiedDelay,
+    unifiedDelayMs,
     innerFrames,
     loop,
     times,
@@ -203,7 +206,6 @@ export function useApng() {
     removeInner,
     setInnerPath,
     setInnerDelay,
-    setAllDelays,
     reorderInner,
     schedulePreview,
     process,

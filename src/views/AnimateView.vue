@@ -21,7 +21,6 @@ import {
   OpenOutline,
   AddOutline,
   ReorderThreeOutline,
-  TrashOutline,
   SparklesOutline,
 } from "@vicons/ionicons5";
 import { invoke } from "@tauri-apps/api/core";
@@ -29,12 +28,15 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import ImagePickerCard from "../components/ImagePickerCard.vue";
 import { useApng } from "../composables/useApng";
+import { useDragDrop } from "../composables/useDragDrop";
 import type { ApngLoop } from "../types";
 
 const message = useMessage();
 const {
   surfacePath,
   surfaceDelayMs,
+  unifiedDelay,
+  unifiedDelayMs,
   innerFrames,
   loop,
   times,
@@ -49,7 +51,6 @@ const {
   filledInners,
   addInner,
   removeInner,
-  setAllDelays,
   reorderInner,
   schedulePreview,
   process,
@@ -62,7 +63,6 @@ const loopOptions: { label: string; value: ApngLoop }[] = [
   { label: "指定次数", value: "times" },
 ];
 
-// 拖拽排序
 const dragIndex = ref<number | null>(null);
 function onDragStart(i: number) {
   dragIndex.value = i;
@@ -74,10 +74,27 @@ function onDrop(i: number) {
   dragIndex.value = null;
 }
 
+/** 滚轮在横向滚动区优先横向滚动，并阻止冒泡到上层平滑滚动容器 */
+function onInnerWheel(e: WheelEvent) {
+  const el = e.currentTarget as HTMLElement;
+  if (!el || el.scrollWidth <= el.clientWidth) return;
+  e.preventDefault();
+  e.stopPropagation();
+  el.scrollLeft += e.deltaY;
+}
+
+/** 添加区：可点击添加空卡，也可直接拖入图片 */
+const addSlotRef = ref<HTMLElement | null>(null);
+const { isDragOver: addDragOver } = useDragDrop(addSlotRef, (path) =>
+  addInner(path),
+);
+
 watch(
   [
     surfacePath,
     surfaceDelayMs,
+    unifiedDelay,
+    unifiedDelayMs,
     innerFrames,
     loop,
     times,
@@ -111,88 +128,111 @@ async function openExportDir() {
     </p>
 
     <n-space vertical :size="16" style="width: 100%">
-      <!-- 表图 -->
-      <n-card title="表图（首帧）" size="small">
-        <n-space vertical :size="12" style="width: 100%">
-          <ImagePickerCard
-            v-model:path="surfacePath"
-            title="表图"
-            hint="拖放或点击选择表图"
-            :box-aspect="16 / 9"
-          />
-          <div class="inline-row">
-            <n-text depth="3">首帧时长</n-text>
-            <n-input-number
-              v-model:value="surfaceDelayMs"
-              :min="50"
-              :max="60000"
-              :step="100"
-              size="small"
-              style="width: 140px"
-            />
-            <span class="unit">ms</span>
-            <n-button size="tiny" secondary @click="setAllDelays(surfaceDelayMs)">
-              应用到所有帧
-            </n-button>
-          </div>
-        </n-space>
-      </n-card>
-
-      <!-- 里图列表 -->
-      <n-card title="里图（后续帧）" size="small">
-        <n-space vertical :size="10" style="width: 100%">
-          <div
-            v-for="(frame, i) in innerFrames"
-            :key="i"
-            class="inner-item"
-          >
-            <div class="item-head">
-              <span
-                class="drag-handle"
-                title="拖动排序"
-                draggable="true"
-                @dragstart="onDragStart(i)"
-                @dragover.prevent
-                @drop="onDrop(i)"
-              >
-                <n-icon :component="ReorderThreeOutline" :size="20" />
-              </span>
-              <n-text depth="3">里图 {{ i + 1 }}</n-text>
-              <n-button quaternary size="tiny" @click="removeInner(i)">
-                <template #icon>
-                  <n-icon :component="TrashOutline" />
-                </template>
-              </n-button>
-            </div>
-
+      <!-- 表图 + 里图 选择区 -->
+      <n-card size="small">
+        <div class="apng-pickers">
+          <!-- 表图（固定） -->
+          <div class="surface-pane">
+            <div class="pane-title">表图</div>
             <ImagePickerCard
-              v-model:path="frame.path"
-              :title="`里图 ${i + 1}`"
-              hint="拖放或点击选择"
-              :box-aspect="16 / 9"
+              v-model:path="surfacePath"
+              title="表图"
+              hint="拖放或点击选择表图"
+              :box-aspect="1"
+              preview-fit="cover"
             />
-
-            <div class="item-delay">
-              <n-text depth="3">时长</n-text>
+            <div class="delay-row">
+              <n-text depth="3" class="delay-label">显示时间</n-text>
               <n-input-number
-                v-model:value="frame.delayMs"
+                v-model:value="surfaceDelayMs"
                 :min="50"
                 :max="60000"
                 :step="100"
                 size="small"
-                style="width: 140px"
+                :show-button="false"
+                class="delay-input"
               />
               <span class="unit">ms</span>
             </div>
           </div>
 
-          <n-button block dashed @click="addInner">
-            <template #icon>
-              <n-icon :component="AddOutline" />
-            </template>
-            添加里图
-          </n-button>
-        </n-space>
+          <!-- 里图（横向滚动） -->
+          <div class="inner-pane">
+            <div class="pane-header">
+              <div class="pane-title">里图</div>
+              <div class="header-right">
+                <div v-if="unifiedDelay" class="delay-row header-delay">
+                  <n-input-number
+                    v-model:value="unifiedDelayMs"
+                    :min="50"
+                    :max="60000"
+                    :step="100"
+                    size="small"
+                    :show-button="false"
+                    class="delay-input"
+                  />
+                  <span class="unit">ms</span>
+                </div>
+                <div class="unified-toggle">
+                  <n-text depth="3">统一显示时间</n-text>
+                  <n-switch v-model:value="unifiedDelay" />
+                </div>
+              </div>
+            </div>
+
+            <div class="inner-row" @wheel="onInnerWheel">
+              <div v-for="(frame, i) in innerFrames" :key="i" class="inner-slot">
+                <ImagePickerCard
+                  v-model:path="frame.path"
+                  :title="`里图 ${i + 1}`"
+                  hint="拖放或点击选择"
+                  :box-aspect="1"
+                  preview-fit="cover"
+                  always-show-clear
+                  @clear="removeInner(i)"
+                />
+                <div class="delay-row slot-delay">
+                  <span
+                    class="drag-handle"
+                    title="拖动排序"
+                    draggable="true"
+                    @dragstart="onDragStart(i)"
+                    @dragover.prevent
+                    @drop="onDrop(i)"
+                  >
+                    <n-icon :component="ReorderThreeOutline" :size="16" />
+                  </span>
+                  <template v-if="!unifiedDelay">
+                    <n-text depth="3" class="delay-label">显示时间</n-text>
+                    <n-input-number
+                      v-model:value="frame.delayMs"
+                      :min="50"
+                      :max="60000"
+                      :step="100"
+                      size="small"
+                      :show-button="false"
+                      class="delay-input"
+                    />
+                    <span class="unit">ms</span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- 添加里图（卡片样式，可拖入图片） -->
+              <div
+                ref="addSlotRef"
+                class="inner-slot add-slot"
+                :class="{ 'drag-over': addDragOver }"
+                @click="addInner()"
+              >
+                <div class="add-box">
+                  <n-icon :component="AddOutline" :size="26" />
+                  <n-text depth="3" class="add-label">添加里图（可拖入图片）</n-text>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </n-card>
 
       <!-- 参数 -->
@@ -258,9 +298,18 @@ async function openExportDir() {
       <!-- 预览 -->
       <n-card title="预览" size="small">
         <div class="preview-box">
-          <img v-if="previewUrl" :src="previewUrl" alt="APNG 预览" class="preview-img" />
+          <img
+            v-if="previewUrl"
+            :src="previewUrl"
+            alt="APNG 预览"
+            class="preview-img"
+          />
           <n-spin v-else-if="previewing" size="small" />
-          <n-empty v-else size="small" :description="previewError || '选择表图与至少 1 张里图后自动生成预览'" />
+          <n-empty
+            v-else
+            size="small"
+            :description="previewError || '选择表图与至少 1 张里图后自动生成预览'"
+          />
         </div>
       </n-card>
 
@@ -319,13 +368,112 @@ async function openExportDir() {
 .animate :deep(.n-card) {
   width: 100%;
 }
-.inline-row,
-.param-row,
-.export-row,
-.export-action {
+
+/* —— 表图/里图选择区 —— */
+.apng-pickers {
+  display: flex;
+  gap: 18px;
+  width: 100%;
+  align-items: flex-start;
+}
+
+.surface-pane {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.inner-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pane-header {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.pane-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-delay {
+  margin: 0;
+}
+
+.unified-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+}
+
+/* 里图横向滚动 + 细滚动条（靠底） */
+.inner-row {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  align-items: flex-start;
+}
+.inner-row::-webkit-scrollbar {
+  height: 4px;
+}
+.inner-row::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.42);
+  border-radius: 999px;
+}
+.inner-row::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.62);
+}
+.inner-row::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.inner-slot {
+  width: 220px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.drag-handle {
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  color: var(--n-text-color-3, #999);
+  user-select: none;
+}
+
+.delay-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.slot-delay {
+  margin-top: 2px;
+}
+.delay-label {
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.delay-input {
+  width: 120px;
 }
 .unit {
   color: var(--n-text-color-3, #999);
@@ -334,30 +482,45 @@ async function openExportDir() {
 .hint {
   font-size: 12px;
 }
-.inner-item {
-  border: 1px solid var(--border-color);
+
+/* 添加里图：卡片样式、可拖入 */
+.add-slot {
+  cursor: pointer;
+  width: 220px;
+}
+.add-box {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px dashed var(--border-color);
   border-radius: 12px;
-  padding: 10px 12px;
   background: var(--preview-bg);
-}
-.item-head {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 8px;
-}
-.drag-handle {
-  display: inline-flex;
-  align-items: center;
-  cursor: grab;
+  justify-content: center;
+  gap: 8px;
   color: var(--n-text-color-3, #999);
-  user-select: none;
+  transition: border-color 0.2s, background 0.2s;
 }
-.item-delay {
+.add-slot:hover .add-box,
+.add-slot.drag-over .add-box {
+  border-color: var(--primary-soft);
+  border-style: solid;
+  background: rgba(91, 124, 250, 0.08);
+}
+.add-label {
+  text-align: center;
+  font-size: 12px;
+  padding: 0 8px;
+}
+
+/* 参数/导出等行 */
+.param-row,
+.export-row,
+.export-action {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-top: 10px;
 }
 .export-row {
   width: 100%;
@@ -368,6 +531,8 @@ async function openExportDir() {
 .export-action {
   gap: 12px;
 }
+
+/* 预览 */
 .preview-box {
   display: flex;
   align-items: center;

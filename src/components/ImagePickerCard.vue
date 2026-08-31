@@ -12,12 +12,20 @@ const props = defineProps<{
   path: string | null;
   /** 父级统一宽高比（两卡同步），未传则用默认 16:9 */
   boxAspect?: number;
+  /** 预览填充方式：contain(完整显示) / cover(放大填充，会裁切) */
+  previewFit?: "contain" | "cover";
+  /** 隐藏底部文件名/选择按钮行（紧凑槽位用） */
+  hideFooter?: boolean;
+  /** 即使未选图也显示「清除」按钮（空槽位可删除用） */
+  alwaysShowClear?: boolean;
 }>();
 
 const emit = defineEmits<{
   "update:path": [value: string | null];
   /** 图片自然尺寸变化；清除或无效时为 null */
   "natural-size": [size: { width: number; height: number } | null];
+  /** 点击「清除」时触发（父级可据此删除槽位） */
+  clear: [];
 }>();
 
 const DEFAULT_ASPECT = 16 / 9;
@@ -31,6 +39,10 @@ function onFileDrop(droppedPath: string) {
 const { isDragOver } = useDragDrop(previewBoxRef, onFileDrop);
 
 const previewUrl = computed(() => (props.path ? convertFileSrc(props.path) : ""));
+const fitStyle = computed(() => ({
+  objectFit: props.previewFit ?? "contain",
+  objectPosition: "center",
+}));
 const fileName = computed(() => {
   if (!props.path) return "";
   const parts = props.path.replace(/\\/g, "/").split("/");
@@ -83,6 +95,7 @@ async function pickImage() {
 function clear() {
   emit("update:path", null);
   emit("natural-size", null);
+  emit("clear");
 }
 </script>
 
@@ -95,7 +108,7 @@ function clear() {
     :content-style="{ overflow: 'visible', paddingBottom: '12px' }"
   >
     <template #header-extra>
-      <n-button v-if="path" quaternary size="tiny" @click.stop="clear">
+      <n-button v-if="path || alwaysShowClear" quaternary size="tiny" @click.stop="clear">
         <template #icon>
           <n-icon :component="CloseCircleOutline" />
         </template>
@@ -119,6 +132,7 @@ function clear() {
         :src="previewUrl"
         :alt="title"
         class="preview-img"
+        :style="fitStyle"
         draggable="false"
         @load="onImgLoad"
       />
@@ -131,7 +145,7 @@ function clear() {
       </div>
     </div>
 
-    <div class="footer">
+    <div v-if="!hideFooter" class="footer">
       <n-text depth="3" class="filename" :title="path || ''">
         {{ path ? fileName : "未选择" }}
       </n-text>
