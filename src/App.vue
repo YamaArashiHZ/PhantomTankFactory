@@ -13,6 +13,7 @@ import "overlayscrollbars/overlayscrollbars.css";
 import AppSidebar from "./components/AppSidebar.vue";
 import UpdaterBootstrap from "./components/UpdaterBootstrap.vue";
 import HomeView from "./views/HomeView.vue";
+import AnimateView from "./views/AnimateView.vue";
 import PreviewView from "./views/PreviewView.vue";
 import AboutView from "./views/AboutView.vue";
 import { useAppConfig, loadAppConfig } from "./composables/useAppConfig";
@@ -196,6 +197,7 @@ onBeforeUnmount(() => {
             <div class="app-main-inner">
               <Transition name="page" mode="out-in">
                 <HomeView v-if="page === 'home'" key="home" />
+                <AnimateView v-else-if="page === 'animate'" key="animate" />
                 <PreviewView v-else-if="page === 'preview'" key="preview" />
                 <AboutView v-else key="about" />
               </Transition>
