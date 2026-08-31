@@ -27,6 +27,9 @@ dist-ssr
 temp/*
 !temp/.gitkeep
 
+# DSH temp & pnpm local store (outside source tree)
+.temp/
+
 # Local reference only (not part of the Tauri app)
 ref/
 
