@@ -16,6 +16,12 @@ const PREVIEW_EDGE = 480;
 /** 预览防抖 */
 const PREVIEW_DEBOUNCE_MS = 280;
 
+/** 生成稳定的帧 id */
+let frameSeq = 0;
+function newFrameId() {
+  return `f${++frameSeq}`;
+}
+
 export function useApng() {
   const message = useMessage();
   const notification = useNotification();
@@ -30,7 +36,7 @@ export function useApng() {
   const unifiedDelayMs = ref(DEFAULT_DELAY_MS);
 
   const innerFrames = ref<ApngInnerFrame[]>([
-    { path: null, delayMs: DEFAULT_DELAY_MS },
+    { id: newFrameId(), path: null, delayMs: DEFAULT_DELAY_MS },
   ]);
 
   const loop = ref<ApngLoop>("infinite");
@@ -53,7 +59,7 @@ export function useApng() {
   );
 
   function addInner(path?: string | null) {
-    innerFrames.value.push({ path: path ?? null, delayMs: DEFAULT_DELAY_MS });
+    innerFrames.value.push({ id: newFrameId(), path: path ?? null, delayMs: DEFAULT_DELAY_MS });
   }
   function removeInner(i: number) {
     innerFrames.value.splice(i, 1);

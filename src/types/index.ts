@@ -7,6 +7,8 @@ export type ApngLoop = "infinite" | "once" | "times";
 
 /** 里图帧：路径 + 独立显示时长(ms) */
 export interface ApngInnerFrame {
+  /** 稳定 id，用于拖拽排序时保持 DOM 身份 */
+  id: string;
   path: string | null;
   delayMs: number;
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, computed, watch, type CSSProperties } from "vue";
 import {
   NCard,
   NSpace,
@@ -23,7 +23,7 @@ import {
   ReorderThreeOutline,
   SparklesOutline,
 } from "@vicons/ionicons5";
-import { invoke } from "@tauri-apps/api/core";
+import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openPath } from "@tauri-apps/plugin-opener";
 import ImagePickerCard from "../components/ImagePickerCard.vue";
@@ -63,16 +63,85 @@ const loopOptions: { label: string; value: ApngLoop }[] = [
   { label: "指定次数", value: "times" },
 ];
 
-const dragIndex = ref<number | null>(null);
-function onDragStart(i: number) {
-  dragIndex.value = i;
+/** —— 指针拖拽排序（手机式 App 图标动效 + live 重排 + 占位）—— */
+const slotEls = ref<Record<string, HTMLElement>>({});
+function setSlotRef(id: string, el: unknown) {
+  if (el) slotEls.value[id] = el as HTMLElement;
+  else delete slotEls.value[id];
 }
-function onDrop(i: number) {
-  if (dragIndex.value !== null && dragIndex.value !== i) {
-    reorderInner(dragIndex.value, i);
+
+const dragId = ref<string | null>(null);
+const dragLeft = ref(0);
+const dragTop = ref(0);
+const dragW = ref(0);
+const dragH = ref(0);
+let grabX = 0;
+let grabY = 0;
+
+const dragFrame = computed(() =>
+  innerFrames.value.find((f) => f.id === dragId.value) ?? null,
+);
+
+function onHandleDown(e: PointerEvent, id: string) {
+  const card = slotEls.value[id];
+  if (!card) return;
+  const r = card.getBoundingClientRect();
+  dragId.value = id;
+  dragLeft.value = r.left;
+  dragTop.value = r.top;
+  dragW.value = r.width;
+  dragH.value = r.height;
+  grabX = e.clientX - r.left;
+  grabY = e.clientY - r.top;
+  // 手柄在拖拽中会被占位替换而卸载，故用 window 级监听
+  window.addEventListener("pointermove", onHandleMove);
+  window.addEventListener("pointerup", onHandleUp);
+  window.addEventListener("pointercancel", onHandleUp);
+  e.preventDefault();
+}
+
+/** 在「非拖拽卡」中按 x 判断插入位置（位于指针左侧的卡数量） */
+function insertionIndex(x: number): number {
+  let idx = 0;
+  for (const f of innerFrames.value) {
+    if (f.id === dragId.value) continue;
+    const el = slotEls.value[f.id];
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (x > r.left + r.width / 2) idx++;
   }
-  dragIndex.value = null;
+  return idx;
 }
+
+function onHandleMove(e: PointerEvent) {
+  if (!dragId.value) return;
+  dragLeft.value = e.clientX - grabX;
+  dragTop.value = e.clientY - grabY;
+  // live 重排：把被拖卡移动到指针所在位置
+  const arr = innerFrames.value;
+  const cur = arr.findIndex((f) => f.id === dragId.value);
+  const to = insertionIndex(e.clientX);
+  if (cur >= 0 && to >= 0 && to !== cur) reorderInner(cur, to);
+}
+
+function onHandleUp() {
+  dragId.value = null;
+  window.removeEventListener("pointermove", onHandleMove);
+  window.removeEventListener("pointerup", onHandleUp);
+  window.removeEventListener("pointercancel", onHandleUp);
+}
+
+const ghostStyle = computed<CSSProperties>(() => ({
+  position: "fixed",
+  left: `${dragLeft.value}px`,
+  top: `${dragTop.value}px`,
+  width: `${dragW.value}px`,
+  height: `${dragH.value}px`,
+  zIndex: 999,
+  pointerEvents: "none",
+  transform: "scale(1.03)",
+  boxShadow: "0 14px 36px rgba(0, 0, 0, 0.25)",
+}));
 
 /** 滚轮在横向滚动区优先横向滚动，并阻止冒泡到上层平滑滚动容器 */
 function onInnerWheel(e: WheelEvent) {
@@ -181,41 +250,54 @@ async function openExportDir() {
             </div>
 
             <div class="inner-row" @wheel="onInnerWheel">
-              <div v-for="(frame, i) in innerFrames" :key="i" class="inner-slot">
-                <ImagePickerCard
-                  v-model:path="frame.path"
-                  :title="`里图 ${i + 1}`"
-                  hint="拖放或点击选择"
-                  :box-aspect="1"
-                  preview-fit="cover"
-                  always-show-clear
-                  @clear="removeInner(i)"
-                />
-                <div class="delay-row slot-delay">
-                  <span
-                    class="drag-handle"
-                    title="拖动排序"
-                    draggable="true"
-                    @dragstart="onDragStart(i)"
-                    @dragover.prevent
-                    @drop="onDrop(i)"
-                  >
-                    <n-icon :component="ReorderThreeOutline" :size="16" />
-                  </span>
-                  <template v-if="!unifiedDelay">
-                    <n-text depth="3" class="delay-label">显示时间</n-text>
-                    <n-input-number
-                      v-model:value="frame.delayMs"
-                      :min="50"
-                      :max="60000"
-                      :step="100"
-                      size="small"
-                      :show-button="false"
-                      class="delay-input"
-                    />
-                    <span class="unit">ms</span>
-                  </template>
-                </div>
+              <div
+                v-for="(frame, i) in innerFrames"
+                :key="frame.id"
+                class="inner-slot"
+                :ref="(el) => setSlotRef(frame.id, el)"
+              >
+                <template v-if="dragId === frame.id">
+                  <div
+                    class="drag-placeholder"
+                    :style="{
+                      width: dragW ? dragW + 'px' : '220px',
+                      height: dragH ? dragH + 'px' : '291px',
+                    }"
+                  ></div>
+                </template>
+                <template v-else>
+                  <ImagePickerCard
+                    v-model:path="frame.path"
+                    :title="`里图 ${i + 1}`"
+                    hint="拖放或点击选择"
+                    :box-aspect="1"
+                    preview-fit="cover"
+                    always-show-clear
+                    @clear="removeInner(i)"
+                  />
+                  <div class="delay-row slot-delay">
+                    <span
+                      class="drag-handle"
+                      title="拖动排序"
+                      @pointerdown="onHandleDown($event, frame.id)"
+                    >
+                      <n-icon :component="ReorderThreeOutline" :size="16" />
+                    </span>
+                    <template v-if="!unifiedDelay">
+                      <n-text depth="3" class="delay-label">显示时间</n-text>
+                      <n-input-number
+                        v-model:value="frame.delayMs"
+                        :min="50"
+                        :max="60000"
+                        :step="100"
+                        size="small"
+                        :show-button="false"
+                        class="delay-input"
+                      />
+                      <span class="unit">ms</span>
+                    </template>
+                  </div>
+                </template>
               </div>
 
               <!-- 添加里图（卡片样式，可拖入图片） -->
@@ -231,6 +313,19 @@ async function openExportDir() {
                 </div>
               </div>
             </div>
+
+            <!-- 拖拽幽灵：跟手浮动 -->
+            <Teleport to="body">
+              <div v-if="dragFrame" class="drag-ghost" :style="ghostStyle">
+                <img
+                  v-if="dragFrame.path"
+                  :src="convertFileSrc(dragFrame.path)"
+                  class="ghost-img"
+                  alt=""
+                />
+                <div v-else class="ghost-empty">添加里图</div>
+              </div>
+            </Teleport>
           </div>
         </div>
       </n-card>
@@ -450,6 +545,36 @@ async function openExportDir() {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  transition: transform 0.15s ease, box-shadow 0.2s ease;
+}
+
+/* 拖拽占位：被拖卡原位置显示虚线空格 */
+.drag-placeholder {
+  box-sizing: border-box;
+  border: 2px dashed var(--primary-soft);
+  border-radius: 14px;
+  background: rgba(91, 124, 250, 0.06);
+}
+
+/* 拖拽幽灵：跟手浮动 */
+.drag-ghost {
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--preview-bg);
+}
+.ghost-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ghost-empty {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--n-text-color-3, #999);
+  font-size: 14px;
 }
 
 .drag-handle {
