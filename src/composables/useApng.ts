@@ -48,8 +48,12 @@ export function useApng() {
 
   const processing = ref(false);
   const previewing = ref(false);
-  const previewUrl = ref<string | null>(null);
+  const frames = ref<string[]>([]);
+  const currentFrame = ref(0);
+  const playing = ref(false);
   const previewError = ref<string | null>(null);
+  /** 当前播放/显示的帧 */
+  const previewSrc = computed(() => frames.value[currentFrame.value] ?? null);
 
   const filledInners = computed(
     () => innerFrames.value.filter((f) => f.path).length,
@@ -110,9 +114,12 @@ export function useApng() {
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let playTimer: ReturnType<typeof setInterval> | null = null;
   async function runPreview() {
     if (!canProcess.value) {
-      previewUrl.value = null;
+      frames.value = [];
+      currentFrame.value = 0;
+      playing.value = false;
       previewError.value = null;
       return;
     }
@@ -123,10 +130,12 @@ export function useApng() {
         ...basePayload(),
         maxEdge: PREVIEW_EDGE,
       });
-      previewUrl.value = res.dataUrl;
+      frames.value = res.frames;
+      currentFrame.value = 0;
+      playing.value = false;
     } catch (e) {
       previewError.value = e instanceof Error ? e.message : String(e);
-      previewUrl.value = null;
+      frames.value = [];
     } finally {
       previewing.value = false;
     }
@@ -134,6 +143,31 @@ export function useApng() {
   function schedulePreview() {
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void runPreview(), PREVIEW_DEBOUNCE_MS);
+  }
+
+  function stopPlay() {
+    if (playTimer) {
+      clearInterval(playTimer);
+      playTimer = null;
+    }
+    playing.value = false;
+  }
+  function nextFrame() {
+    const n = frames.value.length;
+    if (n > 1) currentFrame.value = (currentFrame.value + 1) % n;
+  }
+  function prevFrame() {
+    const n = frames.value.length;
+    if (n > 1) currentFrame.value = (currentFrame.value - 1 + n) % n;
+  }
+  function togglePlay() {
+    if (playing.value) {
+      stopPlay();
+      return;
+    }
+    if (frames.value.length < 2) return;
+    playing.value = true;
+    playTimer = setInterval(() => nextFrame(), 600);
   }
 
   function showDone(result: ApngResult) {
@@ -189,6 +223,7 @@ export function useApng() {
 
   onBeforeUnmount(() => {
     if (timer) clearTimeout(timer);
+    if (playTimer) clearInterval(playTimer);
   });
 
   return {
@@ -204,7 +239,10 @@ export function useApng() {
     maxSizeKb,
     processing,
     previewing,
-    previewUrl,
+    frames,
+    currentFrame,
+    playing,
+    previewSrc,
     previewError,
     canProcess,
     filledInners,
@@ -214,6 +252,9 @@ export function useApng() {
     setInnerDelay,
     reorderInner,
     schedulePreview,
+    nextFrame,
+    prevFrame,
+    togglePlay,
     process,
     exportDirectory,
   };

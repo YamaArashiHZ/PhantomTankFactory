@@ -7,12 +7,11 @@ use serde::Serialize;
 use crate::apng::ApngParams;
 use crate::commands::paths::resolve_temp_dir;
 
-/// 预览结果：data URL + 大小。
+/// 预览结果：每帧 PNG data URL 列表。
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PreviewApngResult {
-    pub data_url: String,
-    pub size_kb: u64,
+    pub frames: Vec<String>,
 }
 
 fn validate_and_params(
@@ -127,14 +126,11 @@ pub async fn preview_apng(
         grayscale,
     )?;
 
-    let (url, size) = tauri::async_runtime::spawn_blocking(move || {
+    let frames = tauri::async_runtime::spawn_blocking(move || {
         crate::apng::preview_apng(&surface, &inner_paths_buf, &params, max_edge)
     })
     .await
     .map_err(|e| e.to_string())??;
 
-    Ok(PreviewApngResult {
-        data_url: url,
-        size_kb: (size + 512) / 1024,
-    })
+    Ok(PreviewApngResult { frames })
 }

@@ -1,5 +1,6 @@
 //! APNG 动图合成：表图作首帧，后续依次为多张里图，输出可循环的 APNG。
 
+use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use base64::{engine::general_purpose::STANDARD, Engine};
@@ -221,13 +222,21 @@ pub fn process_apng(
     })
 }
 
-/// 生成预览 APNG 的 data URL（缩小版）与大小。
+/// 将单帧编码为 PNG data URL。
+fn frame_data_url(img: &RgbaImage) -> Result<String, String> {
+    let mut buf = Vec::new();
+    img.write_to(&mut Cursor::new(&mut buf), image::ImageFormat::Png)
+        .map_err(|e| e.to_string())?;
+    Ok(format!("data:image/png;base64,{}", STANDARD.encode(&buf)))
+}
+
+/// 生成预览：返回每帧的 PNG data URL（用于前端逐帧播放/导航）。
 pub fn preview_apng(
     surface_path: &Path,
     inner_paths: &[PathBuf],
     params: &ApngParams,
     max_edge: u32,
-) -> Result<(String, u64), String> {
+) -> Result<Vec<String>, String> {
     let surface = load_rgba(surface_path)?;
     let (base_w, base_h) = surface.dimensions();
     let mut frames = vec![surface];
@@ -248,19 +257,17 @@ pub fn preview_apng(
     let cw = ((base_w as f64) * scale).round().max(16.0) as u32;
     let ch = ((base_h as f64) * scale).round().max(16.0) as u32;
     let norm = normalize_frames(&frames, cw, ch);
-    let delays = delays_for_keep(params, frames.len());
 
-    let opts = ApngOpts {
-        width: cw,
-        height: ch,
-        num_plays: params.num_plays,
-        compression: params.compression,
-        grayscale: params.grayscale,
-        delays_ms: delays,
-    };
-    let bytes = encode_apng(&norm, &opts)?;
-    let url = format!("data:image/png;base64,{}", STANDARD.encode(&bytes));
-    Ok((url, bytes.len() as u64))
+    let mut urls = Vec::with_capacity(norm.len());
+    for f in &norm {
+        let img = if params.grayscale {
+            crate::phantom::ops::grayscale_keep_alpha(f)
+        } else {
+            f.clone()
+        };
+        urls.push(frame_data_url(&img)?);
+    }
+    Ok(urls)
 }
 
 #[cfg(test)]

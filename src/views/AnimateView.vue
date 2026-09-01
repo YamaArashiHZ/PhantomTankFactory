@@ -22,6 +22,10 @@ import {
   AddOutline,
   ReorderThreeOutline,
   SparklesOutline,
+  PlayOutline,
+  PauseOutline,
+  ChevronBackOutline,
+  ChevronForwardOutline,
 } from "@vicons/ionicons5";
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -45,7 +49,10 @@ const {
   maxSizeKb,
   processing,
   previewing,
-  previewUrl,
+  frames,
+  currentFrame,
+  playing,
+  previewSrc,
   previewError,
   canProcess,
   filledInners,
@@ -53,6 +60,9 @@ const {
   removeInner,
   reorderInner,
   schedulePreview,
+  nextFrame,
+  prevFrame,
+  togglePlay,
   process,
   exportDirectory,
 } = useApng();
@@ -62,6 +72,11 @@ const loopOptions: { label: string; value: ApngLoop }[] = [
   { label: "仅一次", value: "once" },
   { label: "指定次数", value: "times" },
 ];
+
+/** 预览进度百分比（当前帧 / 总帧数） */
+const framePct = computed(() =>
+  frames.value.length ? ((currentFrame.value + 1) / frames.value.length) * 100 : 0,
+);
 
 /** —— 指针拖拽排序（手机式 App 图标动效 + live 重排 + 占位）—— */
 const slotEls = ref<Record<string, HTMLElement>>({});
@@ -438,19 +453,44 @@ async function openExportDir() {
 
       <!-- 预览 -->
       <n-card title="预览" size="small" class="fade-up" style="animation-delay: 0.2s">
-        <div class="preview-box">
-          <img
-            v-if="previewUrl"
-            :src="previewUrl"
-            alt="APNG 预览"
-            class="preview-img"
-          />
-          <n-spin v-else-if="previewing" size="small" />
-          <n-empty
-            v-else
-            size="small"
-            :description="previewError || '选择表图与至少 1 张里图后自动生成预览'"
-          />
+        <div class="preview-wrap">
+          <div class="preview-box">
+            <img
+              v-if="previewSrc"
+              :src="previewSrc"
+              alt="APNG 预览"
+              class="preview-img"
+            />
+            <n-spin v-else-if="previewing" size="small" />
+            <n-empty
+              v-else
+              size="small"
+              :description="previewError || '选择表图与至少 1 张里图后自动生成预览'"
+            />
+          </div>
+
+          <!-- 预览控制台（左下角） -->
+          <div v-if="frames.length > 0" class="preview-console">
+            <n-button text size="small" class="pc-play" @click="togglePlay">
+              <template #icon>
+                <n-icon :component="playing ? PauseOutline : PlayOutline" :size="16" />
+              </template>
+            </n-button>
+            <div class="pc-track">
+              <div class="pc-fill" :style="{ width: framePct + '%' }"></div>
+            </div>
+            <span class="pc-count">{{ currentFrame + 1 }} / {{ frames.length }}</span>
+            <n-button text size="small" class="pc-nav" @click="prevFrame">
+              <template #icon>
+                <n-icon :component="ChevronBackOutline" :size="16" />
+              </template>
+            </n-button>
+            <n-button text size="small" class="pc-nav" @click="nextFrame">
+              <template #icon>
+                <n-icon :component="ChevronForwardOutline" :size="16" />
+              </template>
+            </n-button>
+          </div>
         </div>
       </n-card>
 
@@ -746,6 +786,51 @@ async function openExportDir() {
   max-height: 60vh;
   object-fit: contain;
   display: block;
+}
+
+/* —— 预览控制台（左下角）—— */
+.preview-wrap {
+  position: relative;
+}
+.preview-console {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.78);
+  border-radius: 10px;
+  padding: 2px 6px;
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+.pc-track {
+  width: 120px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.pc-fill {
+  height: 100%;
+  background: #fff;
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+.pc-count {
+  font-size: 12px;
+  min-width: 38px;
+  text-align: center;
+  user-select: none;
+}
+.pc-play,
+.pc-nav {
+  color: #fff;
+}
+.pc-play :deep(.n-button__icon),
+.pc-nav :deep(.n-button__icon) {
+  display: inline-flex;
 }
 
 /* —— 项目风格动效：淡入上移（与全局页面过渡同款缓动）—— */
