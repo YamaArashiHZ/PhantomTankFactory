@@ -143,13 +143,40 @@ const ghostStyle = computed<CSSProperties>(() => ({
   boxShadow: "0 14px 36px rgba(0, 0, 0, 0.25)",
 }));
 
-/** 滚轮在横向滚动区优先横向滚动，并阻止冒泡到上层平滑滚动容器 */
+/** —— 横向平滑滚动（与全局平滑滚动一致的 lerp 缓动）—— */
+const SMOOTH_EASE = 0.18;
+const innerRowRef = ref<HTMLElement | null>(null);
+let hTarget = 0;
+let hRaf = 0;
+
+function clampH(el: HTMLElement, x: number) {
+  const max = Math.max(0, el.scrollWidth - el.clientWidth);
+  return Math.min(max, Math.max(0, x));
+}
+function smoothHTick() {
+  const el = innerRowRef.value;
+  if (!el) {
+    hRaf = 0;
+    return;
+  }
+  const cur = el.scrollLeft;
+  const diff = hTarget - cur;
+  if (Math.abs(diff) < 0.4) {
+    el.scrollLeft = hTarget;
+    hRaf = 0;
+    return;
+  }
+  el.scrollLeft = cur + diff * SMOOTH_EASE;
+  hRaf = requestAnimationFrame(smoothHTick);
+}
 function onInnerWheel(e: WheelEvent) {
-  const el = e.currentTarget as HTMLElement;
+  const el = innerRowRef.value;
   if (!el || el.scrollWidth <= el.clientWidth) return;
   e.preventDefault();
   e.stopPropagation();
-  el.scrollLeft += e.deltaY;
+  if (!hRaf) hTarget = el.scrollLeft;
+  hTarget = clampH(el, hTarget + e.deltaY);
+  if (!hRaf) hRaf = requestAnimationFrame(smoothHTick);
 }
 
 /** 添加区：可点击添加空卡，也可直接拖入图片 */
@@ -191,14 +218,14 @@ async function openExportDir() {
 
 <template>
   <div class="animate">
-    <h1 class="page-title">动图合成（APNG）</h1>
-    <p class="page-subtitle">
+    <h1 class="page-title fade-up">动图合成（APNG）</h1>
+    <p class="page-subtitle fade-up" style="animation-delay: 0.05s">
       选择表图（首帧封面）与若干里图，按每帧时长合成可循环播放的 APNG 动图。
     </p>
 
     <n-space vertical :size="16" style="width: 100%">
       <!-- 表图 + 里图 选择区 -->
-      <n-card size="small">
+      <n-card size="small" class="fade-up" style="animation-delay: 0.1s">
         <div class="apng-pickers">
           <!-- 表图（固定） -->
           <div class="surface-pane">
@@ -249,13 +276,14 @@ async function openExportDir() {
               </div>
             </div>
 
-            <div class="inner-row" @wheel="onInnerWheel">
-              <div
-                v-for="(frame, i) in innerFrames"
-                :key="frame.id"
-                class="inner-slot"
-                :ref="(el) => setSlotRef(frame.id, el)"
-              >
+            <div class="inner-row" ref="innerRowRef" @wheel="onInnerWheel">
+              <TransitionGroup name="slot" tag="div" class="inner-list">
+                <div
+                  v-for="(frame, i) in innerFrames"
+                  :key="frame.id"
+                  class="inner-slot"
+                  :ref="(el) => setSlotRef(frame.id, el)"
+                >
                 <template v-if="dragId === frame.id">
                   <div
                     class="drag-placeholder"
@@ -299,6 +327,7 @@ async function openExportDir() {
                   </div>
                 </template>
               </div>
+              </TransitionGroup>
 
               <!-- 添加里图（卡片样式，可拖入图片） -->
               <div class="inner-slot add-slot" @click="addInner()">
@@ -331,7 +360,7 @@ async function openExportDir() {
       </n-card>
 
       <!-- 参数 -->
-      <n-card title="播放与压缩" size="small">
+      <n-card title="播放与压缩" size="small" class="fade-up" style="animation-delay: 0.15s">
         <n-space vertical :size="14" style="width: 100%">
           <div class="param-row">
             <n-text depth="3" style="width: 88px">循环方式</n-text>
@@ -391,7 +420,7 @@ async function openExportDir() {
       </n-card>
 
       <!-- 预览 -->
-      <n-card title="预览" size="small">
+      <n-card title="预览" size="small" class="fade-up" style="animation-delay: 0.2s">
         <div class="preview-box">
           <img
             v-if="previewUrl"
@@ -409,7 +438,7 @@ async function openExportDir() {
       </n-card>
 
       <!-- 导出 -->
-      <n-card title="导出" size="small">
+      <n-card title="导出" size="small" class="fade-up" style="animation-delay: 0.25s">
         <n-space vertical :size="12" style="width: 100%">
           <div class="export-row">
             <n-input
@@ -545,7 +574,6 @@ async function openExportDir() {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  transition: transform 0.15s ease, box-shadow 0.2s ease;
 }
 
 /* 拖拽占位：被拖卡原位置显示虚线空格 */
@@ -685,5 +713,44 @@ async function openExportDir() {
   max-height: 60vh;
   object-fit: contain;
   display: block;
+}
+
+/* —— 项目风格动效：淡入上移（与全局页面过渡同款缓动）—— */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.fade-up {
+  animation: fade-up 0.35s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* —— 里图卡列表 TransitionGroup：新增淡入 / 重排滑动 / 移除淡出 —— */
+.inner-list {
+  position: relative;
+  display: flex;
+  gap: 12px;
+}
+.slot-enter-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.slot-enter-from {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.slot-leave-active {
+  position: absolute;
+  transition: opacity 0.2s ease;
+}
+.slot-leave-to {
+  opacity: 0;
+}
+.slot-move {
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 </style>
