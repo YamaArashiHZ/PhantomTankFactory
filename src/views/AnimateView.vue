@@ -493,10 +493,11 @@ async function openExportDir() {
 }
 .add-box {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  height: 290px;
+  box-sizing: border-box;
   border-radius: 14px;
-  border: 1px solid var(--border-color);
-  background: var(--preview-bg);
+  border: 1px dashed var(--border-color);
+  background: transparent;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -509,7 +510,6 @@ async function openExportDir() {
 .add-box:hover,
 .add-box.drag-over {
   border-color: var(--primary-soft);
-  background: rgba(91, 124, 250, 0.08);
 }
 .add-icon {
   color: var(--primary-soft);
