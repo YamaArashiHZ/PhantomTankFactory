@@ -214,17 +214,7 @@ function onInnerClear(i: number) {
 }
 
 watch(
-  [
-    surfacePath,
-    surfaceDelayMs,
-    unifiedDelay,
-    unifiedDelayMs,
-    innerFrames,
-    loop,
-    times,
-    compression,
-    grayscale,
-  ],
+  [surfacePath, innerFrames, grayscale],
   () => schedulePreview(),
   { deep: true },
 );

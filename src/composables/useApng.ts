@@ -49,6 +49,7 @@ export function useApng() {
   const processing = ref(false);
   const previewing = ref(false);
   const frames = ref<string[]>([]);
+  const delaysMs = ref<number[]>([]);
   const currentFrame = ref(0);
   const playing = ref(false);
   const previewError = ref<string | null>(null);
@@ -114,13 +115,18 @@ export function useApng() {
   }
 
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let playTimer: ReturnType<typeof setInterval> | null = null;
+  let playTimer: ReturnType<typeof setTimeout> | null = null;
+  /** 预览代数：变更时递增，使旧预览任务的结果失效（取消） */
+  let previewSeq = 0;
   async function runPreview() {
+    const seq = previewSeq;
     if (!canProcess.value) {
       frames.value = [];
+      delaysMs.value = [];
       currentFrame.value = 0;
       playing.value = false;
       previewError.value = null;
+      previewing.value = false;
       return;
     }
     previewing.value = true;
@@ -130,24 +136,39 @@ export function useApng() {
         ...basePayload(),
         maxEdge: PREVIEW_EDGE,
       });
+      if (seq !== previewSeq) return; // 过期结果，丢弃
       frames.value = res.frames;
+      delaysMs.value = res.delaysMs;
       currentFrame.value = 0;
       playing.value = false;
+      previewing.value = false;
     } catch (e) {
+      if (seq !== previewSeq) return;
       previewError.value = e instanceof Error ? e.message : String(e);
       frames.value = [];
-    } finally {
+      delaysMs.value = [];
       previewing.value = false;
     }
   }
   function schedulePreview() {
+    // 取消进行中的预览：使旧任务结果失效
+    previewSeq += 1;
+    // 重新渲染期间：立即隐藏旧帧并显示加载
+    previewing.value = true;
+    frames.value = [];
+    previewError.value = null;
+    if (playTimer) {
+      clearTimeout(playTimer);
+      playTimer = null;
+    }
+    playing.value = false;
     if (timer) clearTimeout(timer);
     timer = setTimeout(() => void runPreview(), PREVIEW_DEBOUNCE_MS);
   }
 
   function stopPlay() {
     if (playTimer) {
-      clearInterval(playTimer);
+      clearTimeout(playTimer);
       playTimer = null;
     }
     playing.value = false;
@@ -155,10 +176,18 @@ export function useApng() {
   function nextFrame() {
     const n = frames.value.length;
     if (n > 1) currentFrame.value = (currentFrame.value + 1) % n;
+    else stopPlay();
   }
   function prevFrame() {
     const n = frames.value.length;
     if (n > 1) currentFrame.value = (currentFrame.value - 1 + n) % n;
+  }
+  /** 按当前帧的设定时长推进播放 */
+  function playTick() {
+    nextFrame();
+    if (!playing.value) return;
+    const d = delaysMs.value[currentFrame.value] ?? 600;
+    playTimer = setTimeout(playTick, d);
   }
   function togglePlay() {
     if (playing.value) {
@@ -167,7 +196,8 @@ export function useApng() {
     }
     if (frames.value.length < 2) return;
     playing.value = true;
-    playTimer = setInterval(() => nextFrame(), 600);
+    const d = delaysMs.value[currentFrame.value] ?? 600;
+    playTimer = setTimeout(playTick, d);
   }
 
   function showDone(result: ApngResult) {
@@ -223,7 +253,7 @@ export function useApng() {
 
   onBeforeUnmount(() => {
     if (timer) clearTimeout(timer);
-    if (playTimer) clearInterval(playTimer);
+    if (playTimer) clearTimeout(playTimer);
   });
 
   return {

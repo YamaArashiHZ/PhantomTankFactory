@@ -24,6 +24,8 @@ export interface ApngResult {
 export interface ApngPreviewResult {
   /** 每帧 PNG data URL 列表 */
   frames: string[];
+  /** 每帧显示时长（ms） */
+  delaysMs: number[];
 }
 
 /** 预览清晰度：低 320 / 中 640 / 高 1280 / 原图(0=不缩小) */

@@ -39,6 +39,14 @@ pub struct ApngResult {
     pub warning: Option<String>,
 }
 
+/// 预览结果：每帧图片 + 每帧显示时长（ms）。
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApngPreview {
+    pub frames: Vec<String>,
+    pub delays_ms: Vec<u32>,
+}
+
 /// 加载图片为 RGBA。
 fn load_rgba(path: &Path) -> Result<RgbaImage, String> {
     let reader = ImageReader::open(path).map_err(|e| format!("打开失败: {e}"))?;
@@ -230,13 +238,13 @@ fn frame_data_url(img: &RgbaImage) -> Result<String, String> {
     Ok(format!("data:image/png;base64,{}", STANDARD.encode(&buf)))
 }
 
-/// 生成预览：返回每帧的 PNG data URL（用于前端逐帧播放/导航）。
+/// 生成预览：返回每帧 PNG data URL 与每帧显示时长（ms），供前端逐帧播放。
 pub fn preview_apng(
     surface_path: &Path,
     inner_paths: &[PathBuf],
     params: &ApngParams,
     max_edge: u32,
-) -> Result<Vec<String>, String> {
+) -> Result<ApngPreview, String> {
     let surface = load_rgba(surface_path)?;
     let (base_w, base_h) = surface.dimensions();
     let mut frames = vec![surface];
@@ -267,7 +275,12 @@ pub fn preview_apng(
         };
         urls.push(frame_data_url(&img)?);
     }
-    Ok(urls)
+
+    let delays_ms = delays_for_keep(params, frames.len());
+    Ok(ApngPreview {
+        frames: urls,
+        delays_ms,
+    })
 }
 
 #[cfg(test)]

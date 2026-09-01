@@ -2,17 +2,8 @@
 
 use std::path::PathBuf;
 
-use serde::Serialize;
-
 use crate::apng::ApngParams;
 use crate::commands::paths::resolve_temp_dir;
-
-/// 预览结果：每帧 PNG data URL 列表。
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PreviewApngResult {
-    pub frames: Vec<String>,
-}
 
 fn validate_and_params(
     _surface_path: &str,
@@ -104,7 +95,7 @@ pub async fn preview_apng(
     compression: u8,
     grayscale: bool,
     max_edge: u32,
-) -> Result<PreviewApngResult, String> {
+) -> Result<crate::apng::ApngPreview, String> {
     let surface = PathBuf::from(&surface_path);
     if !surface.is_file() {
         return Err(format!("表图不存在: {surface_path}"));
@@ -126,11 +117,11 @@ pub async fn preview_apng(
         grayscale,
     )?;
 
-    let frames = tauri::async_runtime::spawn_blocking(move || {
+    let res = tauri::async_runtime::spawn_blocking(move || {
         crate::apng::preview_apng(&surface, &inner_paths_buf, &params, max_edge)
     })
     .await
     .map_err(|e| e.to_string())??;
 
-    Ok(PreviewApngResult { frames })
+    Ok(res)
 }
