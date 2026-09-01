@@ -18,7 +18,7 @@ document.addEventListener(
   "dragstart",
   (e) => {
     const t = e.target as HTMLElement | null;
-    if (t?.closest("input, textarea, [contenteditable='true']")) return;
+    if (t?.closest("input, textarea, [contenteditable='true'], .drag-handle")) return;
     e.preventDefault();
   },
   { capture: true },

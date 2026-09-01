@@ -1,6 +1,32 @@
 export type ThemeMode = "light" | "dark";
 
-export type AppPage = "home" | "preview" | "about";
+export type AppPage = "home" | "animate" | "preview" | "about";
+
+/** APNG 播放方式：无限循环 / 仅一次 / 自定义次数 */
+export type ApngLoop = "infinite" | "once" | "times";
+
+/** 里图帧：路径 + 独立显示时长(ms) */
+export interface ApngInnerFrame {
+  /** 稳定 id，用于拖拽排序时保持 DOM 身份 */
+  id: string;
+  path: string | null;
+  delayMs: number;
+}
+
+/** process_apng 返回 */
+export interface ApngResult {
+  outputPath: string;
+  sizeKb: number;
+  warning: string | null;
+}
+
+/** preview_apng 返回 */
+export interface ApngPreviewResult {
+  /** 每帧 PNG data URL 列表 */
+  frames: string[];
+  /** 每帧显示时长（ms） */
+  delaysMs: number[];
+}
 
 /** 预览清晰度：低 320 / 中 640 / 高 1280 / 原图(0=不缩小) */
 export type PreviewQuality = "low" | "medium" | "high" | "original";

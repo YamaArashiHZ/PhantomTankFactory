@@ -3,6 +3,7 @@ import { NButton, NTooltip, NIcon } from "naive-ui";
 import {
   HomeOutline,
   ImagesOutline,
+  FilmOutline,
   InformationCircleOutline,
   MoonOutline,
   SunnyOutline,
@@ -41,6 +42,24 @@ const emit = defineEmits<{
           </n-button>
         </template>
         主页
+      </n-tooltip>
+
+      <n-tooltip placement="right" :delay="400">
+        <template #trigger>
+          <n-button
+            quaternary
+            circle
+            size="large"
+            :type="current === 'animate' ? 'primary' : 'default'"
+            :class="{ active: current === 'animate' }"
+            @click="emit('navigate', 'animate')"
+          >
+            <template #icon>
+              <n-icon :component="FilmOutline" :size="22" />
+            </template>
+          </n-button>
+        </template>
+        动图合成
       </n-tooltip>
 
       <n-tooltip placement="right" :delay="400">

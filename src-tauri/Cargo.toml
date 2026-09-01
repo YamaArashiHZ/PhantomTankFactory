@@ -1,6 +1,6 @@
 [package]
 name = "phantomtank-factory"
-version = "0.1.0"
+version = "0.3.0"
 description = "PhantomTank Factory - 幻影坦克图片合成工具"
 authors = ["PhantomTank Factory"]
 edition = "2021"
@@ -25,3 +25,4 @@ image = { version = "0.25", default-features = false, features = ["png", "jpeg",
 chrono = "0.4"
 thiserror = "2"
 base64 = "0.22"
+png = "0.17"
