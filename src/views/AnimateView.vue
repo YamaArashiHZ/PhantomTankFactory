@@ -397,17 +397,21 @@ async function openExportDir() {
             <span class="unit">次</span>
           </div>
 
-          <div class="param-row">
-            <n-text depth="3" style="width: 88px">压缩等级</n-text>
-            <n-slider
-              v-model:value="compression"
-              :min="0"
-              :max="9"
-              :step="1"
-              :marks="{ 0: '0', 9: '9' }"
-              style="flex: 1; margin: 0 12px"
-            />
-            <n-text depth="3">{{ compression }}</n-text>
+          <div class="param-block">
+            <div class="param-row">
+              <n-text depth="3" style="width: 88px">压缩等级</n-text>
+              <n-slider
+                v-model:value="compression"
+                :min="0"
+                :max="9"
+                :step="1"
+                style="flex: 1; margin: 0 12px"
+              />
+              <n-text depth="3">{{ compression }}</n-text>
+            </div>
+            <n-text depth="3" class="cond-hint">
+              等级越高，压缩越强、文件越小（无损，不影响画质，仅编码更慢）
+            </n-text>
           </div>
 
           <div class="param-row">
@@ -705,6 +709,15 @@ async function openExportDir() {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+.param-block {
+  width: 100%;
+}
+.cond-hint {
+  font-size: 12px;
+  padding-left: 98px;
+  opacity: 0.8;
+  margin-top: 2px;
 }
 .export-row {
   width: 100%;
