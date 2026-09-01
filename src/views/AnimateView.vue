@@ -179,11 +179,24 @@ function onInnerWheel(e: WheelEvent) {
   if (!hRaf) hRaf = requestAnimationFrame(smoothHTick);
 }
 
-/** 添加区：可点击添加空卡，也可直接拖入图片 */
+/** 添加区：可点击添加空卡，也可拖入图片（无任何里图时禁止拖入添加） */
 const addSlotRef = ref<HTMLElement | null>(null);
-const { isDragOver: addDragOver } = useDragDrop(addSlotRef, (path) =>
-  addInner(path),
+const canDragAdd = computed(() => filledInners.value >= 1);
+const { isDragOver: addDragOver } = useDragDrop(
+  addSlotRef,
+  (path) => {
+    if (canDragAdd.value) addInner(path);
+  },
+  () => canDragAdd.value,
 );
+
+/** 里图至少保留一张：最后一张点「清除」只清图片、不清除卡片 */
+function onInnerClear(i: number) {
+  if (innerFrames.value.length > 1) {
+    removeInner(i);
+  }
+  // 仅剩一张时，update:path(null) 已清空图片，保留卡片
+}
 
 watch(
   [
@@ -301,7 +314,7 @@ async function openExportDir() {
                     :box-aspect="1"
                     preview-fit="cover"
                     always-show-clear
-                    @clear="removeInner(i)"
+                    @clear="onInnerClear(i)"
                   />
                   <div class="delay-row slot-delay">
                     <span
@@ -334,7 +347,7 @@ async function openExportDir() {
                 <div
                   ref="addSlotRef"
                   class="add-box"
-                  :class="{ 'drag-over': addDragOver }"
+                  :class="{ 'drag-over': addDragOver && canDragAdd, 'drag-disabled': !canDragAdd }"
                 >
                   <n-icon :component="AddOutline" :size="34" class="add-icon" />
                   <n-text depth="3" class="add-label">添加里图</n-text>
@@ -663,6 +676,13 @@ async function openExportDir() {
 .add-box:hover,
 .add-box.drag-over {
   border-color: var(--primary-soft);
+}
+.add-box.drag-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.add-box.drag-disabled:hover {
+  border-color: var(--border-color);
 }
 .add-icon {
   color: var(--primary-soft);

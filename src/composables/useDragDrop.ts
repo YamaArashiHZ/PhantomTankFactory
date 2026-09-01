@@ -46,14 +46,17 @@ export const dragHoles = reactive<Map<symbol, GhostRect>>(new Map());
 export function useDragDrop(
   targetRef: Readonly<Ref<HTMLElement | null>>,
   onFileDrop: (path: string) => void,
+  enabled?: () => boolean,
 ) {
   const isDragOver = ref(false);
   const holeKey = Symbol();
   let unlisten: (() => void) | null = null;
 
+  const isEnabled = () => (enabled ? enabled() : true);
+
   function syncHole() {
     const el = targetRef.value;
-    if (!el || !isGlobalDragActive.value) {
+    if (!el || !isGlobalDragActive.value || !isEnabled()) {
       dragHoles.delete(holeKey);
       return;
     }
@@ -79,6 +82,7 @@ export function useDragDrop(
           const el = targetRef.value;
           if (
             el &&
+            isEnabled() &&
             rectContainsPoint(el, payload.position.x, payload.position.y)
           ) {
             const imageFile = payload.paths.find(isImageFile);
@@ -87,6 +91,7 @@ export function useDragDrop(
         } else if (payload.type === "enter" || payload.type === "over") {
           const el = targetRef.value;
           isDragOver.value =
+            isEnabled() &&
             el != null &&
             rectContainsPoint(el, payload.position.x, payload.position.y);
           syncHole();
