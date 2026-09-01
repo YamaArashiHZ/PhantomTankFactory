@@ -151,7 +151,8 @@ mod tests {
             }
             off += 12 + len;
             if tstr == "IEND" {
-                break;            }
+                break;
+            }
         }
 
         assert_eq!(actl, Some((2, 0)), "acTL 应为 2 帧、无限循环");

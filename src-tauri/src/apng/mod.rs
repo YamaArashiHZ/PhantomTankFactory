@@ -363,8 +363,9 @@ mod tests {
     fn actl_frame_count(bytes: &[u8]) -> Option<u32> {
         let mut off = 8usize;
         while off + 12 <= bytes.len() {
-            let len = u32::from_be_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]])
-                as usize;
+            let len =
+                u32::from_be_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]])
+                    as usize;
             let ty = &bytes[off + 4..off + 8];
             if ty == b"acTL" {
                 let nf = u32::from_be_bytes([
