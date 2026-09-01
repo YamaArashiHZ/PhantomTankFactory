@@ -132,7 +132,8 @@ fn converge(
         keep_counts.push(full - 1);
     }
     keep_counts.retain(|&k| k >= 2);
-    keep_counts.sort();
+    // 降序：优先保留全部帧；无大小上限时第一次即返回全部帧
+    keep_counts.sort_by(|a, b| b.cmp(a));
     keep_counts.dedup();
 
     let grayscale_opts: Vec<bool> = if params.grayscale {
@@ -356,6 +357,53 @@ mod tests {
         let (bytes, warning) = converge(&frames, 8, 8, &params);
         assert!(!bytes.is_empty());
         assert!(warning.is_none());
+    }
+
+    /// 解析 APNG 的 acTL 帧数。
+    fn actl_frame_count(bytes: &[u8]) -> Option<u32> {
+        let mut off = 8usize;
+        while off + 12 <= bytes.len() {
+            let len = u32::from_be_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]])
+                as usize;
+            let ty = &bytes[off + 4..off + 8];
+            if ty == b"acTL" {
+                let nf = u32::from_be_bytes([
+                    bytes[off + 8],
+                    bytes[off + 9],
+                    bytes[off + 10],
+                    bytes[off + 11],
+                ]);
+                return Some(nf);
+            }
+            off += 12 + len;
+            if ty == b"IEND" {
+                break;
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn converge_without_cap_keeps_all_frames() {
+        // 4 帧、无上限：应保留全部 4 帧（回归：升序曾导致只保留 2 帧）
+        let frames = vec![
+            solid(8, 8, 255, 0, 0, 255),
+            solid(8, 8, 0, 255, 0, 255),
+            solid(8, 8, 0, 0, 255, 255),
+            solid(8, 8, 255, 255, 0, 255),
+        ];
+        let params = ApngParams {
+            surface_delay_ms: 100,
+            inner_delays_ms: vec![100, 100, 100],
+            num_plays: 0,
+            compression: 6,
+            grayscale: false,
+            max_size_kb: None,
+        };
+        let (bytes, warning) = converge(&frames, 8, 8, &params);
+        assert!(!bytes.is_empty());
+        assert!(warning.is_none());
+        assert_eq!(actl_frame_count(&bytes), Some(4));
     }
 
     #[test]

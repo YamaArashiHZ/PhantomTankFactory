@@ -151,8 +151,7 @@ mod tests {
             }
             off += 12 + len;
             if tstr == "IEND" {
-                break;
-            }
+                break;            }
         }
 
         assert_eq!(actl, Some((2, 0)), "acTL 应为 2 帧、无限循环");
@@ -174,5 +173,44 @@ mod tests {
         };
         let bytes = encode_apng(&frames, &opts).expect("encode grayscale");
         assert!(bytes.windows(4).any(|w| w == b"acTL"));
+    }
+
+    /// 解析 acTL 的 num_plays。
+    fn actl_num_plays(bytes: &[u8]) -> Option<u32> {
+        let mut off = 8usize;
+        while off + 16 <= bytes.len() {
+            let len =
+                u32::from_be_bytes([bytes[off], bytes[off + 1], bytes[off + 2], bytes[off + 3]])
+                    as usize;
+            let ty = &bytes[off + 4..off + 8];
+            if ty == b"acTL" {
+                let n = u32::from_be_bytes([
+                    bytes[off + 12],
+                    bytes[off + 13],
+                    bytes[off + 14],
+                    bytes[off + 15],
+                ]);
+                return Some(n);
+            }
+            off += 12 + len;
+            if ty == b"IEND" {
+                break;
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn encode_writes_num_plays() {
+        let opts = ApngOpts {
+            width: 4,
+            height: 4,
+            num_plays: 3,
+            compression: 6,
+            grayscale: false,
+            delays_ms: vec![1000, 500],
+        };
+        let bytes = encode_apng(&frames(), &opts).expect("encode");
+        assert_eq!(actl_num_plays(&bytes), Some(3));
     }
 }

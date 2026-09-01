@@ -140,6 +140,7 @@ export function useApng() {
       frames.value = res.frames;
       delaysMs.value = res.delaysMs;
       currentFrame.value = 0;
+      cycle = 1;
       playing.value = false;
       previewing.value = false;
     } catch (e) {
@@ -166,6 +167,8 @@ export function useApng() {
     timer = setTimeout(() => void runPreview(), PREVIEW_DEBOUNCE_MS);
   }
 
+  /** 当前播到第几遍（用于「仅一次/指定次数」在预览播放时停止） */
+  let cycle = 1;
   function stopPlay() {
     if (playTimer) {
       clearTimeout(playTimer);
@@ -182,10 +185,24 @@ export function useApng() {
     const n = frames.value.length;
     if (n > 1) currentFrame.value = (currentFrame.value - 1 + n) % n;
   }
-  /** 按当前帧的设定时长推进播放 */
+  /** 按当前帧时长推进，并遵循循环设置（0=无限 / 1=仅一次 / N=指定次数） */
   function playTick() {
-    nextFrame();
-    if (!playing.value) return;
+    const n = frames.value.length;
+    if (n <= 1) {
+      stopPlay();
+      return;
+    }
+    const lp = loopPlays.value;
+    const next = (currentFrame.value + 1) % n;
+    if (next === 0 && lp !== 0) {
+      // 从末帧回到首帧，计一轮
+      if (cycle >= lp) {
+        stopPlay();
+        return;
+      }
+      cycle += 1;
+    }
+    currentFrame.value = next;
     const d = delaysMs.value[currentFrame.value] ?? 600;
     playTimer = setTimeout(playTick, d);
   }
@@ -195,6 +212,7 @@ export function useApng() {
       return;
     }
     if (frames.value.length < 2) return;
+    cycle = 1;
     playing.value = true;
     const d = delaysMs.value[currentFrame.value] ?? 600;
     playTimer = setTimeout(playTick, d);
